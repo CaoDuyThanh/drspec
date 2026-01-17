@@ -1,0 +1,40 @@
+{
+  "name": "drspec",
+  "version": "0.1.0",
+  "description": "AI-powered design-by-contract specification tool",
+  "bin": {
+    "drspec": "./bin/drspec"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "os": ["darwin", "linux", "win32"],
+  "cpu": ["x64", "arm64"],
+  "engines": {
+    "node": ">=14"
+  },
+  "keywords": [
+    "contracts",
+    "verification",
+    "testing",
+    "ai",
+    "design-by-contract",
+    "specification",
+    "invariants"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/drspec-ai/drspec"
+  },
+  "homepage": "https://github.com/drspec-ai/drspec#readme",
+  "bugs": {
+    "url": "https://github.com/drspec-ai/drspec/issues"
+  },
+  "author": "DrSpec Team",
+  "files": [
+    "bin/",
+    "install.js",
+    "README.md"
+  ]
+}

@@ -1,0 +1,6 @@
+#!/bin/sh
+# DrSpec wrapper script for Unix systems
+# This script is invoked by npm and executes the downloaded binary
+
+DIR="$(dirname "$0")"
+exec "$DIR/drspec-bin" "$@"
