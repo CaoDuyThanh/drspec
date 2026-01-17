@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const VERSION = require('./package.json').version;
-const BINARY_HOST = 'https://github.com/drspec-ai/drspec/releases/download';
+const BINARY_HOST = 'https://github.com/CaoDuyThanh/drspec/releases/download';
 
 // Platform detection mapping
 const PLATFORMS = {

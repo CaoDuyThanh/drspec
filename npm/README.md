@@ -56,7 +56,7 @@ drspec verify run "module.py::function_name"
 
 ## Documentation
 
-For full documentation, visit: https://github.com/drspec-ai/drspec
+For full documentation, visit: https://github.com/CaoDuyThanh/drspec
 
 ## Python Package
 

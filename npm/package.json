@@ -25,11 +25,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/drspec-ai/drspec"
+    "url": "https://github.com/CaoDuyThanh/drspec"
   },
-  "homepage": "https://github.com/drspec-ai/drspec#readme",
+  "homepage": "https://github.com/CaoDuyThanh/drspec#readme",
   "bugs": {
-    "url": "https://github.com/drspec-ai/drspec/issues"
+    "url": "https://github.com/CaoDuyThanh/drspec/issues"
   },
   "author": "DrSpec Team",
   "files": [
