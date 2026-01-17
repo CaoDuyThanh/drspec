@@ -1,6 +1,6 @@
 # DrSpec
 
-AI-powered design-by-contract specification tool for runtime verification.
+DrSpec (or Doctor Specification) is an AI-powered design-by-contract specification tool for runtime verification.
 
 DrSpec builds a **Semantic Mirror** of your codebase. For every function in your source code, it generates a "Contract" that defines its purpose, invariants, and verification logic.
 
