@@ -157,6 +157,25 @@ DrSpec stores all data in `_drspec/contracts.db` (DuckDB format):
 - **dependencies**: Function call relationships
 - **learning_history**: Bug patterns learned from git
 
+## Version Management
+
+- Single source of truth: `VERSION` (kept in sync with Python and npm packages)
+- Sync everything after edits: `make version-sync`
+- Bump semantic versions: `make version-bump-patch` / `make version-bump-minor` / `make version-bump-major`
+- Downgrade safely with cascading logic: `make downgrade-patch` / `make downgrade-minor` / `make downgrade-major`
+- Updated files: `VERSION`, `pyproject.toml`, `npm/package.json`, `src/drspec/__init__.py`
+
+```bash
+# bump and sync
+make version-bump-patch
+
+# downgrade and sync
+make downgrade-minor
+
+# just resync from VERSION
+make version-sync
+```
+
 ## Development
 
 ```bash
