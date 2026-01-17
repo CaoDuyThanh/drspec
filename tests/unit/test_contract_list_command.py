@@ -413,7 +413,7 @@ class TestContractListCommand:
 
     def test_list_help(self):
         """Test contract list help displays options."""
-        result = runner.invoke(app, ["contract", "list", "--help"], color=False)
+        result = runner.invoke(app, ["contract", "list", "--help"], terminal_width=200)
         assert result.exit_code == 0
         assert "status" in result.stdout.lower()
         assert "path" in result.stdout.lower()
