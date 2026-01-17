@@ -10,7 +10,7 @@ from drspec.cli.app import app
 from drspec.db import get_connection, insert_artifact, insert_contract
 
 
-runner = CliRunner(mix_stderr=False)
+runner = CliRunner()
 
 
 def make_valid_contract(
