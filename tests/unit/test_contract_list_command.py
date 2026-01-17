@@ -10,7 +10,7 @@ from drspec.cli.app import app
 from drspec.db import get_connection, insert_artifact, insert_contract
 
 
-runner = CliRunner()
+runner = CliRunner(mix_stderr=False)
 
 
 def make_valid_contract(
@@ -413,7 +413,7 @@ class TestContractListCommand:
 
     def test_list_help(self):
         """Test contract list help displays options."""
-        result = runner.invoke(app, ["contract", "list", "--help"])
+        result = runner.invoke(app, ["contract", "list", "--help"], terminal_width=120)
         assert result.exit_code == 0
         assert "status" in result.stdout.lower()
         assert "path" in result.stdout.lower()
