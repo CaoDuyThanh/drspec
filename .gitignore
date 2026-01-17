@@ -36,7 +36,6 @@ out/
 *.swo
 *~
 .vscode/
-.github/
 
 # AI/Agent tools
 .claude/
