@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from drspec.parsers.cpp_parser import CppParser
-from drspec.parsers.models import ExtractedFunction, ParseResult
 
 
 @pytest.fixture

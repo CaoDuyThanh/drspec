@@ -72,7 +72,7 @@ def prompt_multi_select(prompt: str, choices: List[tuple[str, str]], preselected
     print(f"  {len(choices) + 1}. [ ] None (skip IDE integration)")
 
     if preselected:
-        print(f"\n  * = detected existing config")
+        print("\n  * = detected existing config")
 
     while True:
         try:
@@ -290,7 +290,7 @@ def prompt_project_root(cwd: Path, detected: Path) -> Path:
     # Validate the path exists
     if not selected.exists():
         print(f"Warning: Path does not exist: {selected}")
-        print(f"Creating directory...")
+        print("Creating directory...")
         selected.mkdir(parents=True, exist_ok=True)
 
     print(f"\nInitializing DrSpec at {selected}\n")

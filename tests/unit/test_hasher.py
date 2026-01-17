@@ -1,6 +1,5 @@
 """Tests for the code hasher module."""
 
-import pytest
 
 from drspec.core.hasher import compute_hash, normalize_code
 

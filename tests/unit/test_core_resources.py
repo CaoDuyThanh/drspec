@@ -1,9 +1,7 @@
 """Tests for core resources module."""
 
 from pathlib import Path
-from unittest.mock import patch
 
-import pytest
 
 from drspec.core.resources import (
     get_templates_path,

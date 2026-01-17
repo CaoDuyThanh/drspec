@@ -1,6 +1,5 @@
 """Tests for version and package structure."""
 
-import pytest
 
 
 def test_version_exists():

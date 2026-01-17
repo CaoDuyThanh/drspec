@@ -1,6 +1,5 @@
 """Tests for the hint detection module."""
 
-import pytest
 
 from drspec.core.hints import (
     Hint,

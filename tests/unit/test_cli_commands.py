@@ -2,7 +2,6 @@
 
 import json
 
-import pytest
 from typer.testing import CliRunner
 
 from drspec.cli.app import app

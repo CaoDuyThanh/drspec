@@ -9,7 +9,6 @@ These tests verify the root cause analysis API:
 
 from __future__ import annotations
 
-import pytest
 
 from drspec.debugging import (
     ViolationDetail,

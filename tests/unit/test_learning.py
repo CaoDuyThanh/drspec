@@ -10,8 +10,6 @@ import duckdb
 from drspec.learning.diff import (
     DiffHunk,
     FileDiff,
-    CommitDiff,
-    DiffAnalysis,
     parse_unified_diff,
     _detect_bug_fix,
 )
@@ -23,8 +21,6 @@ from drspec.learning.patterns import (
     extract_patterns_from_diff,
 )
 from drspec.learning.strengthening import (
-    InvariantSuggestion,
-    ContractStrengthening,
     match_pattern_to_contract,
     suggest_invariants,
     strengthen_contract,

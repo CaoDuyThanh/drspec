@@ -7,7 +7,7 @@ within a debugging workflow, enabling handoff to the Architect Council.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import duckdb
 
@@ -220,8 +220,8 @@ def _generate_reason(relationship: str, depth: int, caller_id: str) -> str:
 
     if relationship == "callee":
         return (
-            f"Directly called by the debug target. "
-            f"A contract would help verify inputs/outputs at this call site."
+            "Directly called by the debug target. "
+            "A contract would help verify inputs/outputs at this call site."
         )
 
     return (
@@ -252,8 +252,8 @@ def _generate_suggestion(
         m = missing[0]
         if m.relationship == "direct":
             lines.append(
-                f"The function being debugged lacks a contract. "
-                f"Generate one first for effective debugging."
+                "The function being debugged lacks a contract. "
+                "Generate one first for effective debugging."
             )
         else:
             lines.append(
@@ -280,7 +280,7 @@ def _generate_suggestion(
         for m in missing:
             lines.append(f"   - {m.function_id} (priority {m.priority})")
     else:
-        lines.append(f"   - Top 3 priorities:")
+        lines.append("   - Top 3 priorities:")
         for m in missing[:3]:
             lines.append(f"     {m.function_id}")
 

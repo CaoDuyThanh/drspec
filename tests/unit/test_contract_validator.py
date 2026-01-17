@@ -2,7 +2,6 @@
 
 import json
 
-import pytest
 
 from drspec.contracts import (
     Contract,

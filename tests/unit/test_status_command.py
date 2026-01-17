@@ -4,11 +4,9 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from drspec.cli.app import app
-from drspec.cli.commands.init import DRSPEC_FOLDER, DB_NAME
 
 
 runner = CliRunner()

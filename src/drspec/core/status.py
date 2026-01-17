@@ -13,7 +13,6 @@ Artifact statuses represent the lifecycle state of contract generation:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import duckdb
 

@@ -12,8 +12,6 @@ from drspec.core.scanner import (
     ScanResult,
     scan_file,
     scan_directory,
-    LANGUAGE_MAP,
-    DEFAULT_IGNORES,
 )
 
 
@@ -268,7 +266,7 @@ class TestScanDirectory:
         def on_progress(progress: ScanProgress):
             progress_updates.append(progress)
 
-        result = scanner.scan_directory(
+        scanner.scan_directory(
             temp_project,
             recursive=True,
             progress_callback=on_progress,

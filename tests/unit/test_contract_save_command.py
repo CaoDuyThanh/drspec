@@ -2,11 +2,8 @@
 
 import json
 import tempfile
-from io import StringIO
 from pathlib import Path
-from unittest.mock import patch
 
-import pytest
 from typer.testing import CliRunner
 
 from drspec.cli.app import app
@@ -15,7 +12,6 @@ from drspec.db import (
     get_connection,
     get_contract,
     get_reasoning_traces,
-    init_schema,
     insert_artifact,
 )
 

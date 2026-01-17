@@ -9,7 +9,6 @@ These tests verify the handoff messaging API:
 
 from __future__ import annotations
 
-import pytest
 
 from drspec.core import (
     HandoffMessage,

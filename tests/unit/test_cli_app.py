@@ -1,6 +1,5 @@
 """Tests for CLI application."""
 
-import pytest
 from typer.testing import CliRunner
 
 from drspec import __version__

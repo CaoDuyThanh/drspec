@@ -10,7 +10,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import matplotlib
 import matplotlib.pyplot as plt

@@ -1,9 +1,7 @@
 """Tests for PyInstaller configuration and binary build."""
 
-import os
 from pathlib import Path
 
-import pytest
 
 
 def test_pyinstaller_spec_exists():

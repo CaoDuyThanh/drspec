@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from drspec.parsers.javascript_parser import JavaScriptParser
-from drspec.parsers.models import ExtractedFunction, ParseResult
 
 
 @pytest.fixture

@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from drspec.core.ide.prompts import (
     detect_project_root,
@@ -235,7 +234,6 @@ class TestInitWithProjectRoot:
 
     def test_init_creates_nonexistent_project_root(self):
         """Test init creates project root if it doesn't exist."""
-        import json
         from typer.testing import CliRunner
         from drspec.cli.app import app
 

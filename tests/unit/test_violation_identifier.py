@@ -9,7 +9,6 @@ These tests verify the violation identification API:
 
 from __future__ import annotations
 
-import pytest
 
 from drspec.debugging import (
     InvariantResult,

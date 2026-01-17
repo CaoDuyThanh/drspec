@@ -387,8 +387,8 @@ def init_command(
                 elif non_interactive:
                     should_overwrite = False  # Safe default
                 elif is_interactive():
-                    print(f"\n⚠️  DrSpec is already initialized in this project.")
-                    print(f"\nThe following files will be overwritten:")
+                    print("\n⚠️  DrSpec is already initialized in this project.")
+                    print("\nThe following files will be overwritten:")
                     print(f"  • _drspec/agents/*.md ({existing_agents} files)")
                     print()
                     should_overwrite = prompt_yes_no("Overwrite existing agent files?", default=False)

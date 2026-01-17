@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from drspec.contracts.schema import Contract
-from drspec.db.connection import get_connection, get_db_path, DEFAULT_DB_PATH
+from drspec.db.connection import get_connection, get_db_path
 from drspec.db.queries import (
     QueueItem,
     get_contract as db_get_contract,

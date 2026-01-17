@@ -360,9 +360,6 @@ def save(
         # 2. Update the artifact status
         # 3. Restore the FK references
 
-        # Save existing contract if any
-        existing_contract = get_contract(conn, function_id)
-
         # Save queue entry if any
         queue_row = conn.execute(
             "SELECT priority, status, reason, attempts, max_attempts, error_message FROM queue WHERE function_id = ?",

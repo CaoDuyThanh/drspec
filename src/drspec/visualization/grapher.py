@@ -7,11 +7,10 @@ colored by contract status.
 from __future__ import annotations
 
 import hashlib
-import json
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 import duckdb
 import matplotlib

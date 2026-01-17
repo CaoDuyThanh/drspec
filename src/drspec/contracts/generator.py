@@ -69,10 +69,10 @@ def _generate_invariant_check(index: int, invariant: Invariant) -> list[str]:
     func_name = f"_check_invariant_{index}"
     lines.append(f"def {func_name}(input_data: dict[str, Any], output_data: Any) -> bool:")
     lines.append(f'    """Check: {invariant.name}')
-    lines.append(f"")
+    lines.append("")
     lines.append(f"    Logic: {invariant.logic}")
     lines.append(f"    Criticality: {invariant.criticality.value}")
-    lines.append(f'    """')
+    lines.append('    """')
 
     # Try to translate the invariant logic to Python
     check_code = _translate_invariant_logic(invariant.logic, invariant.name)
@@ -159,7 +159,6 @@ def _translate_invariant_logic(logic: str, name: str) -> Optional[str]:
         Python expression string, or None if untranslatable.
     """
     logic_lower = logic.lower().strip()
-    name_lower = name.lower()
 
     # Pattern: output is not empty / non-empty output
     if any(p in logic_lower for p in ["not empty", "non-empty", "non empty", "nonempty"]):

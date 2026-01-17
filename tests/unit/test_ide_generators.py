@@ -1,9 +1,7 @@
 """Tests for IDE launcher generators."""
 
-import tempfile
 from pathlib import Path
 
-import pytest
 
 from drspec.core.ide import (
     AGENT_METADATA,

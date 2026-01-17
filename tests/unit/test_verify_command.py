@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-from io import StringIO
-from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner

@@ -1,6 +1,5 @@
 """Tests for the Librarian agent prompt template."""
 
-from pathlib import Path
 
 import pytest
 

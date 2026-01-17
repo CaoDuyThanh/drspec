@@ -12,7 +12,6 @@ import time
 from datetime import datetime
 from decimal import Decimal
 
-import pytest
 
 # Import from debugging module to avoid contracts package (Pydantic 3.8 issue)
 from drspec.debugging import (
