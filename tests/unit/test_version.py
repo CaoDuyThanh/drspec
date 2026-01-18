@@ -1,5 +1,6 @@
 """Tests for version and package structure."""
 
+from pathlib import Path
 
 
 def test_version_exists():
@@ -21,8 +22,16 @@ def test_version_format():
         assert part.isdigit(), f"Version part '{part}' should be numeric"
 
 
-def test_version_value():
-    """Test initial version value."""
+def test_version_matches_version_file():
+    """Test that __version__ matches VERSION file (single source of truth)."""
     from drspec import __version__
 
-    assert __version__ == "0.1.0"
+    # Read from VERSION file which is the single source of truth
+    version_file = Path(__file__).parent.parent.parent / "VERSION"
+    assert version_file.exists(), "VERSION file not found at project root"
+
+    expected_version = version_file.read_text().strip()
+    assert __version__ == expected_version, (
+        f"__version__ ({__version__}) should match VERSION file ({expected_version}). "
+        "Use 'make version-sync' to synchronize all version files."
+    )

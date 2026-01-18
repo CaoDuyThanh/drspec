@@ -17,7 +17,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22'  # Use Node 22+ for newer npm
+        node-version: '24'  # Use Node 24+ for newer npm
         registry-url: 'https://registry.npmjs.org'
     - name: Install dependencies
       run: npm ci --ignore-scripts
