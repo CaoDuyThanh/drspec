@@ -14,14 +14,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Sync versions from VERSION
+      run: |
+        ./scripts/sync-versions.sh
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '24'  # Use Node 24+ for newer npm
+        node-version: '24'  # Use Node 24+ for newer npm, otherwise 'publish' fails
         registry-url: 'https://registry.npmjs.org'
     - name: Install dependencies
-      run: npm ci --ignore-scripts
+      run: |
+        npm ci --ignore-scripts
+      working-directory: npm
+    - name: Run tests (if present)
+      run: |
+        npm test --if-present
+      working-directory: npm
+    - name: Build package (if present)
+      run: |
+        npm run build --if-present
       working-directory: npm
     - name: Publish to npm
-      run: npm publish --provenance --access public
+      run: |
+        npm publish --provenance --access public
       working-directory: npm
