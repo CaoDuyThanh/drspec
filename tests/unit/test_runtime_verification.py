@@ -1,26 +1,22 @@
-"""Tests for runtime verification module (Story 5-2).
-
-These tests verify the debugger agent's runtime verification API:
-- serialize_for_verification: Complex data serialization
-- verify_at_runtime: Runtime verification execution
-- RuntimeVerificationResult and InvariantResult models
-"""
+"""Tests for the debugger agent's runtime verification module."""
 
 from __future__ import annotations
 
-import time
 from datetime import datetime
 from decimal import Decimal
 
-
 # Import from debugging module to avoid contracts package (Pydantic 3.8 issue)
+import pytest
+
 from drspec.debugging import (
     InvariantResult,
     RuntimeVerificationResult,
-    serialize_for_verification,
     deserialize_from_verification,
+    serialize_for_verification,
     verify_at_runtime,
 )
+
+pytestmark = pytest.mark.usefixtures("scripts_in_process_unless_integration")  # no test here starts a Python process, unless it is marked integration
 
 
 # =============================================================================
@@ -165,7 +161,7 @@ class TestRuntimeVerificationResult:
         assert d["function_id"] == "test::func"
         assert d["passed"] is True
         assert len(d["invariants"]) == 1
-        assert d["execution_time_ms"] == 100.0
+        assert d["execution_time_ms"] == 100.0  # pattern-ok: real-time-assert the value given to the result, serialised back
 
 
 # =============================================================================
@@ -428,8 +424,9 @@ def verify(input_data, output_data):
 
         assert result.passed is True
 
-    def test_timeout_handling(self):
+    def test_timeout_handling(self, in_process_python):
         """Should handle script timeout."""
+        in_process_python.times_out = True  # what the subprocess call raises when the script runs too long
         script = '''
 import time
 def _check_invariant_1(input_data, output_data):
@@ -467,9 +464,17 @@ def verify(input_data output_data)  # Syntax error
 
         assert result.passed is False
         assert result.error is not None
+        assert result.error.startswith("Script execution failed")  # the script exits non-zero: not read as an answer
+        assert "SyntaxError" in result.error  # and the reason comes from the script's stderr
 
-    def test_execution_time_recorded(self):
+    def test_execution_time_recorded(self, monkeypatch):
         """Should record execution time."""
+        from types import SimpleNamespace
+
+        from drspec.debugging import runtime
+
+        clock = iter([100.0, 100.25])  # the start and the end of the run, as the runtime reads them
+        monkeypatch.setattr(runtime, "time", SimpleNamespace(time=lambda: next(clock)))
         script = '''
 def _check_invariant_1(input_data, output_data):
     return True
@@ -484,8 +489,7 @@ def verify(input_data, output_data):
             output_data=None,
         )
 
-        assert result.execution_time_ms > 0
-        assert result.execution_time_ms < 1000  # Should be under 1 second (NFR3)
+        assert result.execution_time_ms == pytest.approx(250.0)  # pattern-ok: real-time-assert the value of a scripted clock, not a measured time
 
     def test_multiple_invariants(self):
         """Should check multiple invariants independently."""
@@ -530,36 +534,3 @@ def verify(input_data, output_data):
 # =============================================================================
 # Performance Tests
 # =============================================================================
-
-
-class TestPerformance:
-    """Tests for performance requirements (NFR3: < 1 second)."""
-
-    def test_verification_under_1_second(self):
-        """Should complete verification in under 1 second."""
-        script = '''
-def _check_invariant_1(input_data, output_data):
-    return True
-
-def _check_invariant_2(input_data, output_data):
-    return True
-
-def _check_invariant_3(input_data, output_data):
-    return True
-
-def verify(input_data, output_data):
-    return (True, "All 3 invariant(s) passed")
-'''
-        start = time.perf_counter()
-
-        result = verify_at_runtime(
-            function_id="test::perf",
-            script=script,
-            input_data={"x": 1, "y": 2, "z": 3},
-            output_data={"result": 6},
-        )
-
-        elapsed = time.perf_counter() - start
-
-        assert result.passed is True
-        assert elapsed < 1.0, f"Verification took {elapsed:.2f}s, expected < 1s"

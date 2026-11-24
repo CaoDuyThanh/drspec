@@ -18,25 +18,39 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install ruff
+        pip install ruff==0.14.13
     - name: Lint with ruff
-      run: ruff check src/ tests/
+      run: python scripts/check_lint.py
 
   test:
+    strategy:
+      matrix:
+        python: ['3.8', '3.12']
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: ${{ matrix.python }}
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev]
     - name: Run tests
-      run: pytest tests/ --cov=src/drspec --cov-report=xml
+      run: pytest tests/ -m 'not socket' --cov=src/drspec --cov-report=xml  # the quick lane and the slow lane together
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    - run: pip install -e .[dev]
+    - name: Localhost socket integration tests
+      run: pytest tests/ -m 'socket'

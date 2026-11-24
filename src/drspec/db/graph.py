@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, List, Optional, Set, Tuple
 
 import duckdb
+from drspec.core.identity import display_name
 
 
 # =============================================================================
@@ -147,17 +148,13 @@ def get_dependency_graph(
         >>> graph.has_cycles
         False
     """
-    # Validate depth
     depth = max(1, min(5, depth))
 
-    # Initialize graph
     graph = DependencyGraph(root_function_id=function_id)
 
-    # Track visited nodes and their relationships
     visited: dict[str, str] = {}  # function_id -> relationship
     all_edges: List[Tuple[str, str]] = []
 
-    # Add root node
     root_info = _get_node_info(conn, function_id)
     if root_info:
         graph.nodes.append(DependencyNode(
@@ -171,10 +168,10 @@ def get_dependency_graph(
         ))
         visited[function_id] = "root"
     else:
-        # Root doesn't exist in artifacts
+        # function_id isn't in artifacts (e.g. unresolved reference)
         graph.nodes.append(DependencyNode(
             function_id=function_id,
-            function_name=function_id.split("::")[-1] if "::" in function_id else function_id,
+            function_name=display_name(function_id),
             file_path="",
             status="UNKNOWN",
             has_contract=False,
@@ -183,7 +180,6 @@ def get_dependency_graph(
         ))
         visited[function_id] = "root"
 
-    # BFS for callees
     if direction in ("callees", "both"):
         _bfs_traverse(
             conn=conn,
@@ -196,7 +192,6 @@ def get_dependency_graph(
             nodes=graph.nodes,
         )
 
-    # BFS for callers
     if direction in ("callers", "both"):
         _bfs_traverse(
             conn=conn,
@@ -209,7 +204,6 @@ def get_dependency_graph(
             nodes=graph.nodes,
         )
 
-    # Detect cycles and build edges
     cyclic_edges = _detect_cycles(all_edges)
     for caller_id, callee_id in all_edges:
         graph.edges.append(DependencyEdge(
@@ -371,13 +365,11 @@ def _bfs_traverse(
     """
     queue: deque[Tuple[str, int]] = deque()
 
-    # Get initial neighbors
     for neighbor_id in get_neighbors(conn, start_id):
         if neighbor_id not in visited:
             queue.append((neighbor_id, 1))
             visited[neighbor_id] = relationship
 
-        # Add edge
         if relationship == "callee":
             edges.append((start_id, neighbor_id))
         else:  # caller
@@ -386,7 +378,6 @@ def _bfs_traverse(
     while queue:
         current_id, current_depth = queue.popleft()
 
-        # Get node info and add to nodes list
         node_info = _get_node_info(conn, current_id)
         if node_info:
             nodes.append(DependencyNode(
@@ -399,10 +390,10 @@ def _bfs_traverse(
                 relationship=visited[current_id],
             ))
         else:
-            # Function not in artifacts - add with limited info
+            # Not in artifacts - add with limited info
             nodes.append(DependencyNode(
                 function_id=current_id,
-                function_name=current_id.split("::")[-1] if "::" in current_id else current_id,
+                function_name=display_name(current_id),
                 file_path="",
                 status="UNKNOWN",
                 has_contract=False,
@@ -410,22 +401,18 @@ def _bfs_traverse(
                 relationship=visited[current_id],
             ))
 
-        # Continue BFS if not at max depth
         if current_depth < depth:
             for neighbor_id in get_neighbors(conn, current_id):
-                # Add edge
                 if relationship == "callee":
                     edges.append((current_id, neighbor_id))
                 else:  # caller
                     edges.append((neighbor_id, current_id))
 
-                # Queue if not visited
                 if neighbor_id not in visited:
                     visited[neighbor_id] = relationship
                     queue.append((neighbor_id, current_depth + 1))
                 elif visited[neighbor_id] != relationship:
-                    # Node was visited from other direction - mark as "both"
-                    # Update existing node
+                    # Visited from the other direction too - mark as "both"
                     for node in nodes:
                         if node.function_id == neighbor_id:
                             node.relationship = "both"
@@ -443,7 +430,6 @@ def _detect_cycles(edges: List[Tuple[str, str]]) -> Set[Tuple[str, str]]:
     Returns:
         Set of cyclic edges.
     """
-    # Build adjacency list
     graph: dict[str, Set[str]] = defaultdict(set)
     for caller_id, callee_id in edges:
         graph[caller_id].add(callee_id)
@@ -460,12 +446,11 @@ def _detect_cycles(edges: List[Tuple[str, str]]) -> Set[Tuple[str, str]]:
             if neighbor not in visited:
                 dfs(neighbor)
             elif neighbor in rec_stack:
-                # Found back edge - marks a cycle
+                # Back edge to a node still on the recursion stack = cycle
                 cyclic_edges.add((node, neighbor))
 
         rec_stack.remove(node)
 
-    # Run DFS from all unvisited nodes
     for node in list(graph.keys()):
         if node not in visited:
             dfs(node)
@@ -489,11 +474,9 @@ def get_graph_statistics(
     Returns:
         Dictionary with graph statistics.
     """
-    # Count nodes and edges
     node_count = conn.execute("SELECT COUNT(*) FROM artifacts").fetchone()[0]
     edge_count = conn.execute("SELECT COUNT(*) FROM dependencies").fetchone()[0]
 
-    # Count functions with contracts
     with_contracts = conn.execute(
         """
         SELECT COUNT(*)
@@ -502,7 +485,6 @@ def get_graph_statistics(
         """
     ).fetchone()[0]
 
-    # Find most connected functions (by callee count)
     most_callees = conn.execute(
         """
         SELECT caller_id, COUNT(*) as cnt
@@ -513,7 +495,6 @@ def get_graph_statistics(
         """
     ).fetchall()
 
-    # Find most called functions
     most_callers = conn.execute(
         """
         SELECT callee_id, COUNT(*) as cnt

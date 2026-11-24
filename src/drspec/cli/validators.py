@@ -37,3 +37,31 @@ def validate_function_id(function_id: str) -> tuple[bool, Optional[str]]:
         return False, "Function ID function_name part cannot be empty"
 
     return True, None
+
+
+def resolve_or_exit(conn, function_id: str, json_output: bool) -> str:
+    """The stored identifier for what the user typed. `file::name` without the `#hash`
+    stands for the one function with that name in that file; if several share it, the
+    candidates are listed and the command ends (the connection is closed first)."""
+    import typer
+
+    from drspec.cli.output import ErrorCode, error_response, output
+    from drspec.db import AmbiguousFunctionId, resolve_function_id
+
+    try:
+        resolved = resolve_function_id(conn, function_id)
+        from drspec.core.index_notice import queue_if_unindexed
+
+        queue_if_unindexed(conn, resolved)
+        return resolved
+    except AmbiguousFunctionId as e:
+        conn.close()
+        output(
+            error_response(
+                ErrorCode.INVALID_FUNCTION_ID,
+                str(e),
+                {"function_id": function_id, "candidates": [{"function_id": fid, "signature": sig} for fid, sig in e.candidates]},
+            ),
+            json_output=json_output,
+        )
+        raise typer.Exit(1)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -10,8 +11,15 @@ import typer
 
 from drspec.cli.output import output, success_response, error_response
 from drspec.contracts import DEFAULT_CONFIDENCE_THRESHOLD, set_confidence_threshold
+from drspec.cli.commands.scan import _progress_line
+from drspec.core.indexing import scan_message, scan_whole_project, start_indexing
 from drspec.core.resources import get_templates_path
 from drspec.db.connection import ensure_db_directory, get_connection, init_schema
+from drspec.db.fk_migration import ensure_fk_layout
+from drspec.db.identity_migration import ensure_identity_layout
+from drspec.db.migration import MigrationError, ensure_embedding_layout
+from drspec.staleness_worker import is_worker_running, stop_worker
+from drspec.worker_ipc import worker_is_outdated
 
 # Default paths
 DRSPEC_FOLDER = "_drspec"
@@ -22,9 +30,33 @@ GITIGNORE_ENTRY = "_drspec/"
 
 app = typer.Typer(
     name="init",
-    help="Initialize DrSpec in the current project",
+    help=(
+        "Initialize DrSpec in the current project. After the setup the worker is started and indexes the project in the "
+        "background (about 20% of the machine); --scan scans it at full speed and waits, as 'drspec scan' does. The scan "
+        "options (--deep-scan, --embed, --code-only, --docs-only) are options of 'drspec scan'."
+    ),
     no_args_is_help=False,
 )
+
+
+def is_initialized_database(db_path: Path) -> bool:
+    """Whether `db_path` is a usable drspec database.
+
+    A live worker has the file open and already initialized the schema;
+    probing it directly would fail on the lock, which a caller would
+    misread as a corrupt database and re-initialize over.
+    """
+    if is_worker_running(db_path) is not None:
+        return True
+    try:
+        conn = get_connection(db_path)
+        try:
+            conn.execute("SELECT 1 FROM artifacts LIMIT 1")
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001 - any failure to open/query means "not usable"
+        return False
+    return True
 
 
 def update_gitignore(project_root: Path) -> bool:
@@ -40,118 +72,19 @@ def update_gitignore(project_root: Path) -> bool:
 
     if gitignore_path.exists():
         content = gitignore_path.read_text()
-        # Check if already present (as line or with trailing newline)
+        # entry may be stored with or without the trailing slash
         lines = content.splitlines()
         if GITIGNORE_ENTRY in lines or GITIGNORE_ENTRY.rstrip("/") in lines:
             return False
 
-        # Append to existing file
         with gitignore_path.open("a") as f:
-            # Add newline if file doesn't end with one
             if content and not content.endswith("\n"):
                 f.write("\n")
             f.write(f"{GITIGNORE_ENTRY}\n")
     else:
-        # Create new .gitignore
         gitignore_path.write_text(f"{GITIGNORE_ENTRY}\n")
 
     return True
-
-
-def check_existing_files(project_root: Path, agents_folder: Path, selected_ides: list[str]) -> dict:
-    """Check for existing config files that would be overwritten.
-
-    Args:
-        project_root: Project root directory.
-        agents_folder: Path to agents folder.
-        selected_ides: List of selected IDE identifiers.
-
-    Returns:
-        Dictionary with existing file counts by category.
-    """
-    existing = {
-        "agents": 0,
-        "cursor": 0,
-        "claude-code": 0,
-        "github-copilot": 0,
-        "codex": 0,
-    }
-
-    # Check agents folder
-    if agents_folder.exists():
-        existing["agents"] = len(list(agents_folder.glob("*.md")))
-
-    # Check IDE launcher folders
-    if "cursor" in selected_ides:
-        cursor_dir = project_root / ".cursor" / "rules" / "drspec"
-        if cursor_dir.exists():
-            existing["cursor"] = len(list(cursor_dir.glob("*.mdc")))
-
-    if "claude-code" in selected_ides:
-        claude_dir = project_root / ".claude" / "commands" / "drspec"
-        if claude_dir.exists():
-            existing["claude-code"] = len(list(claude_dir.glob("*.md")))
-
-    if "github-copilot" in selected_ides:
-        copilot_dir = project_root / ".github" / "agents"
-        if copilot_dir.exists():
-            existing["github-copilot"] = len(list(copilot_dir.glob("drspec-*.agent.md")))
-
-    if "codex" in selected_ides:
-        codex_dir = project_root / ".codex" / "prompts"
-        if codex_dir.exists():
-            existing["codex"] = len(list(codex_dir.glob("drspec-*.md")))
-
-    return existing
-
-
-def prompt_overwrite_confirmation(existing: dict, force: bool, non_interactive: bool) -> bool:
-    """Prompt user to confirm overwriting existing files.
-
-    Args:
-        existing: Dictionary with existing file counts.
-        force: If True, skip confirmation.
-        non_interactive: If True and not force, skip overwrite.
-
-    Returns:
-        True if should proceed with overwrite, False otherwise.
-    """
-    from drspec.core.ide.prompts import prompt_yes_no, is_interactive
-
-    # Count total existing files
-    total = sum(existing.values())
-    if total == 0:
-        return True  # No existing files, proceed
-
-    # Force flag bypasses confirmation
-    if force:
-        return True
-
-    # Non-interactive mode without force = skip overwrite (safe default)
-    if non_interactive:
-        return False
-
-    # Not in TTY = skip overwrite
-    if not is_interactive():
-        return False
-
-    # Show warning and prompt
-    print("\n⚠️  DrSpec is already initialized in this project.")
-    print("\nThe following files will be overwritten:")
-
-    if existing["agents"] > 0:
-        print(f"  • _drspec/agents/*.md ({existing['agents']} files)")
-    if existing["cursor"] > 0:
-        print(f"  • .cursor/rules/drspec/*.mdc ({existing['cursor']} files)")
-    if existing["claude-code"] > 0:
-        print(f"  • .claude/commands/drspec/*.md ({existing['claude-code']} files)")
-    if existing["github-copilot"] > 0:
-        print(f"  • .github/agents/drspec-*.agent.md ({existing['github-copilot']} files)")
-    if existing["codex"] > 0:
-        print(f"  • .codex/prompts/drspec-*.md ({existing['codex']} files)")
-
-    print()
-    return prompt_yes_no("Overwrite existing files?", default=False)
 
 
 def copy_agent_templates(templates_src: Path, agents_dest: Path) -> list[str]:
@@ -168,13 +101,11 @@ def copy_agent_templates(templates_src: Path, agents_dest: Path) -> list[str]:
     copied = []
 
     if templates_src.exists():
-        # Copy top-level .md files
         for template_file in templates_src.glob("*.md"):
             dest_file = agents_dest / template_file.name
             shutil.copy2(template_file, dest_file)
             copied.append(template_file.name)
 
-        # Copy subdirectories (e.g., helpers/)
         for subdir in templates_src.iterdir():
             if subdir.is_dir():
                 dest_subdir = agents_dest / subdir.name
@@ -203,12 +134,12 @@ def setup_ide_integrations(
     """
     from drspec.core.ide import IDE_REGISTRY
     from drspec.core.ide.codex import CodexSetup
+    from drspec.core.ide.mcp_registration import register as register_mcp_server
 
     results = {}
 
     for ide_name in ["cursor", "claude-code", "github-copilot", "codex"]:
         if ide_name in selected_ides:
-            # Special handling for Codex global install
             if ide_name == "codex":
                 setup = CodexSetup(global_install=codex_global)
             else:
@@ -226,6 +157,12 @@ def setup_ide_integrations(
                     "path": str(output_dir),
                     "files_created": len(created_files),
                 }
+                if hasattr(setup, "get_skill_path"):  # (Claude Code: the skill that says when to run the contract workflow)
+                    results[ide_name]["skill"] = str(setup.get_skill_path(project_root).relative_to(project_root))
+                # The tools themselves (`mcp__drspec__search` and the rest) come from the MCP server the client is
+                # told to start, so the provider's MCP file gets the drspec entry too.
+                registration = register_mcp_server(ide_name, project_root, codex_global)
+                results[ide_name]["mcp_server"] = registration.as_dict()
             except Exception as e:
                 results[ide_name] = {
                     "enabled": False,
@@ -237,15 +174,24 @@ def setup_ide_integrations(
     return results
 
 
-def _get_output_settings(ctx: typer.Context) -> tuple[bool, bool]:
-    """Get output settings from context.
+def mcp_notes(ide_results: dict) -> list:
+    """One line per provider about its MCP server entry: what was written (and to restart the client), what was left
+    alone and why, and the lines to add by hand when the file is outside the project."""
+    notes = []
+    for name, result in ide_results.items():
+        registration = result.get("mcp_server") if isinstance(result, dict) else None
+        if not registration or registration["state"] == "present":
+            continue
+        notes.append(f"{name}: {registration['message']}")
+        notes.extend(f"    {line}" for line in registration.get("lines", []))
+    return notes
 
-    Returns:
-        Tuple of (json_output, pretty).
-    """
+
+def _get_output_settings(ctx: typer.Context) -> bool:
+    """Get the json_output setting from context."""
     if ctx.obj is None:
-        return True, False
-    return ctx.obj.get("json_output", True), ctx.obj.get("pretty", False)
+        return False
+    return ctx.obj.get("json_output", False)
 
 
 @app.callback(invoke_without_command=True)
@@ -255,7 +201,7 @@ def init_command(
         False,
         "--force",
         "-f",
-        help="Force re-initialization, bypass overwrite confirmation",
+        help="On an already-initialized project, overwrite the agent templates without asking. Never clears the database.",
     ),
     confidence_threshold: int = typer.Option(
         DEFAULT_CONFIDENCE_THRESHOLD,
@@ -291,6 +237,25 @@ def init_command(
         "-p",
         help="Project root directory (default: auto-detect or current directory)",
     ),
+    scan: bool = typer.Option(
+        False,
+        "--scan",
+        help=(
+            "After the setup, scan the whole project at full speed and wait for it, as 'drspec scan' does "
+            "(Ctrl-C cancels the scan; the setup stays). Without it the worker indexes the project in the "
+            "background, at about 20% of the machine."
+        ),
+    ),
+    no_wait: bool = typer.Option(
+        False,
+        "--no-wait",
+        help="With --scan: queue the files at background priority and return at once, as 'scan --no-wait' does.",
+    ),
+    no_index: bool = typer.Option(
+        False,
+        "--no-index",
+        help="Do not start the worker: the setup only. (The next command that needs the worker starts it.)",
+    ),
 ) -> None:
     """Initialize DrSpec database and configuration in the current project.
 
@@ -303,44 +268,82 @@ def init_command(
         drspec init --ide cursor --ide claude-code  # Multiple IDEs
         drspec init --no-ide                  # Skip IDE integration
         drspec init --non-interactive         # Use defaults, no prompts
-        drspec init --force                   # Overwrite without confirmation
+        drspec init --force                   # Overwrite agent templates without asking
         drspec init --project-root /path/to/project  # Explicit project root
+        drspec init --scan                    # Set up, then scan the whole project at full speed and wait
+        drspec init --scan --no-wait          # Set up, queue the whole project and return at once
+        drspec init --no-index                # Set up only; start no worker
+
+    After the setup the worker is started, and it indexes the project in the background (about 20% of the machine,
+    one parser when the machine is busy). 'drspec scan' finishes the index at full speed; the scan options
+    (--deep-scan, --embed, --code-only, --docs-only) are options of 'drspec scan'.
     """
     from drspec.core.ide.prompts import detect_project_root, prompt_project_root, is_interactive
 
-    json_output, pretty = _get_output_settings(ctx)
+    json_output = _get_output_settings(ctx)
     cwd = Path.cwd()
 
-    # Step 0: Determine project root
     if project_root_path:
-        # Explicit path provided via CLI
         project_root = project_root_path.expanduser().resolve()
         if not project_root.exists():
             project_root.mkdir(parents=True, exist_ok=True)
     else:
-        # Auto-detect project root
         detected_root = detect_project_root(cwd)
 
         if non_interactive:
-            # Non-interactive: use detected root silently
             project_root = detected_root
         elif is_interactive():
-            # Interactive: prompt if cwd != detected
             project_root = prompt_project_root(cwd, detected_root)
         else:
-            # Non-TTY: use detected root
             project_root = detected_root
     drspec_folder = project_root / DRSPEC_FOLDER
     db_path = drspec_folder / DB_NAME
     agents_folder = drspec_folder / AGENTS_FOLDER
 
+    if scan and no_index:
+        output(error_response("INVALID_INPUT", "--scan needs the worker; it cannot be combined with --no-index."), json_output=json_output)
+        raise typer.Exit(1)
+
+    def finish(data: dict) -> None:
+        """The result of a setup that worked: what was started, and with --scan the scan, as one result."""
+        exit_code = 0
+        if not no_index:
+            data["indexing"] = start_indexing(db_path)
+        if scan:
+            show_progress = sys.stderr.isatty() and not json_output
+            try:
+                summary = scan_whole_project(
+                    db_path, wait=not no_wait, on_progress=_progress_line if show_progress else None
+                )
+            except Exception as e:  # noqa: BLE001 - the setup is done; the scan's failure is part of the result
+                data["scan"] = {"state": "failed", "error": str(e)}
+                data["message"] = f"{data.get('message', 'DrSpec initialized')}; the scan failed: {e}"
+                exit_code = 1
+            else:
+                if show_progress:
+                    sys.stderr.write("\r\033[K")
+                    sys.stderr.flush()
+                if summary.get("publish_error"):
+                    exit_code = 1
+                elif summary.get("state") == "cancelled":
+                    exit_code = 130
+                data["scan"] = summary
+                data["indexing"] = {"started": True, "message": scan_message(summary)}
+        elif data.get("indexing", {}).get("started"):
+            data["message"] = f"{data.get('message', 'DrSpec initialized')}; {data['indexing']['message']}"
+        elif data.get("indexing", {}).get("warning"):
+            data["warning"] = data["indexing"]["warning"]
+        output(success_response(data), json_output=json_output)
+        if exit_code:
+            raise typer.Exit(exit_code)
+
     try:
-        # Determine selected IDEs (before checking for existing files)
+        # resolved before the existing-files check below, since that check
+        # depends on which IDEs are selected
         selected_ides: list[str] = []
         if no_ide:
             selected_ides = []
         elif ide:
-            # Validate IDE names
             valid_ides = {"cursor", "claude-code", "github-copilot", "codex"}
             for ide_name in ide:
                 if ide_name not in valid_ides:
@@ -348,36 +351,44 @@ def init_command(
                         "INVALID_IDE",
                         f"Unknown IDE: {ide_name}. Valid options: {', '.join(sorted(valid_ides))}",
                         {"ide": ide_name, "valid_options": sorted(valid_ides)},
-                    ), json_output=json_output, pretty=pretty)
+                    ), json_output=json_output)
                     raise typer.Exit(1)
             selected_ides = list(ide)
         elif not non_interactive:
-            # Interactive mode - prompt for IDE selection (after overwrite check)
-            # We'll do this later, after confirming overwrite
+            # deferred until after the overwrite check below
             pass
 
-        # Check if already initialized
         is_reinit = drspec_folder.exists() and db_path.exists()
 
-        if is_reinit:
-            # Verify DB is valid
+        if is_reinit and not force and is_worker_running(db_path) is not None and worker_is_outdated(db_path):
+            # A worker from before an upgrade never ran the current rebuilds, and keeps
+            # old code running on this file. Replace it; the next command starts a current one.
             try:
-                conn = get_connection(db_path)
-                conn.execute("SELECT 1 FROM artifacts LIMIT 1")
-                conn.close()
-            except Exception:
-                # DB exists but is corrupt - treat as fresh init
-                is_reinit = False
+                stop_worker(db_path)
+            except OSError as e:
+                output(error_response("WORKER_OUTDATED", f"The worker runs older code than the installed one and could not be stopped: {e}. Run 'drspec worker stop'.", {"db_path": str(db_path)}), json_output=json_output)
+                raise typer.Exit(1)
 
-        # For re-init: check existing AGENT files and prompt for confirmation FIRST
-        # (before asking about IDE selection - per architect spec)
+        if is_reinit and not force and is_worker_running(db_path) is None:
+            # A current worker has already done this at its own start.
+            try:
+                ensure_embedding_layout(db_path)
+                ensure_fk_layout(db_path)
+                ensure_identity_layout(db_path)
+            except MigrationError as e:
+                output(error_response("MIGRATION_FAILED", str(e), {"db_path": str(db_path)}), json_output=json_output)
+                raise typer.Exit(1)
+
+        if is_reinit and not is_initialized_database(db_path):
+            is_reinit = False  # an unusable DB is treated as a fresh init
+
+        # overwrite confirmation must happen before IDE selection, so a user
+        # who declines isn't asked IDE questions for nothing
         if is_reinit:
-            # Step 1: Check for existing agent files FIRST
             existing_agents = 0
             if agents_folder.exists():
                 existing_agents = len(list(agents_folder.glob("*.md")))
 
-            # Step 2: Prompt for overwrite confirmation if agent files exist
             if existing_agents > 0:
                 from drspec.core.ide.prompts import prompt_yes_no
 
@@ -396,94 +407,81 @@ def init_command(
                     should_overwrite = False  # Non-TTY, safe default
 
                 if not should_overwrite:
-                    # User declined overwrite - exit early
-                    output(success_response({
+                    finish({
                         "message": "DrSpec already initialized (no changes made)",
                         "drspec_folder": str(drspec_folder),
                         "database": str(db_path),
                         "agents_folder": str(agents_folder),
                         "already_initialized": True,
                         "overwrite_skipped": True,
-                    }), json_output=json_output, pretty=pretty)
+                    })
                     return
 
-            # Step 3: THEN ask about IDE selection (only after user confirmed overwrite)
             if not ide and not no_ide and not non_interactive:
                 from drspec.core.ide.prompts import prompt_ide_selection
                 if is_interactive():
                     selected_ides = prompt_ide_selection(project_root)
 
-            # Step 4: Copy agents and set up IDE integrations
             templates_path = get_templates_path()
             copied_templates = copy_agent_templates(templates_path, agents_folder)
 
-            # Set up IDE integrations
             ide_results = {}
             if selected_ides:
                 ide_results = setup_ide_integrations(
                     project_root, selected_ides, codex_global
                 )
 
-            output(success_response({
+            finish({
                 "message": "DrSpec already initialized",
                 "drspec_folder": str(drspec_folder),
                 "database": str(db_path),
                 "agents_folder": str(agents_folder),
                 "agents_updated": copied_templates,
                 "ide_integrations": ide_results if ide_results else None,
+                "mcp_server": mcp_notes(ide_results) or None,
                 "already_initialized": True,
-            }), json_output=json_output, pretty=pretty)
+            })
             return
 
-        # Fresh init - prompt for IDE selection if interactive
         if not ide and not no_ide and not non_interactive:
             from drspec.core.ide.prompts import prompt_ide_selection
             if is_interactive():
                 selected_ides = prompt_ide_selection(project_root)
 
-        # Create _drspec folder
         drspec_folder.mkdir(parents=True, exist_ok=True)
 
-        # Ensure db directory and create connection
         ensure_db_directory(db_path)
         conn = get_connection(db_path)
 
-        # Initialize schema (rebuild if force)
         init_schema(conn, rebuild=force)
-
-        # Set confidence threshold in config
         set_confidence_threshold(conn, confidence_threshold)
 
         conn.close()
 
-        # Copy agent templates
         templates_path = get_templates_path()
         copied_templates = copy_agent_templates(templates_path, agents_folder)
 
-        # Update .gitignore
         gitignore_updated = update_gitignore(project_root)
 
-        # Set up IDE integrations
         ide_results = {}
         if selected_ides:
             ide_results = setup_ide_integrations(
                 project_root, selected_ides, codex_global
             )
 
-        # Return success response
-        output(success_response({
+        finish({
             "message": "DrSpec initialized successfully",
             "drspec_folder": str(drspec_folder),
             "database": str(db_path),
             "agents_folder": str(agents_folder),
             "templates_copied": copied_templates,
             "ide_integrations": ide_results if ide_results else None,
+            "mcp_server": mcp_notes(ide_results) or None,
             "gitignore_updated": gitignore_updated,
             "confidence_threshold": confidence_threshold,
-        }), json_output=json_output, pretty=pretty)
+        })
 
     except typer.Exit:
-        # Re-raise typer.Exit without additional error message
         raise
 
     except PermissionError as e:
@@ -491,7 +489,7 @@ def init_command(
             "PERMISSION_DENIED",
             f"Cannot create _drspec/ folder: {e}",
             {"path": str(drspec_folder)},
-        ), json_output=json_output, pretty=pretty)
+        ), json_output=json_output)
         raise typer.Exit(1)
 
     except Exception as e:
@@ -499,5 +497,5 @@ def init_command(
             "INIT_FAILED",
             f"Initialization failed: {e}",
             {"error_type": type(e).__name__},
-        ), json_output=json_output, pretty=pretty)
+        ), json_output=json_output)
         raise typer.Exit(1)

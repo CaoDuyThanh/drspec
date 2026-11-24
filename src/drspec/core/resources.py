@@ -19,10 +19,8 @@ def _get_base_path() -> Path:
         - In development mode: src/ directory (containing agents/)
     """
     if getattr(sys, "frozen", False):
-        # Running as PyInstaller bundle
         return Path(sys._MEIPASS)  # type: ignore
     else:
-        # Running in development - go up from core/resources.py to src/
         # src/drspec/core/resources.py -> src/drspec/core -> src/drspec -> src
         return Path(__file__).parent.parent.parent
 
@@ -39,11 +37,9 @@ def get_templates_path() -> Path:
         True
     """
     if getattr(sys, "frozen", False):
-        # In frozen mode, agents are bundled at root level
         return Path(sys._MEIPASS) / "agents"  # type: ignore
     else:
-        # In development/installed mode, agents are in drspec/agents/
-        # Go from core/resources.py -> core -> drspec -> drspec/agents
+        # core/resources.py -> core -> drspec -> drspec/agents
         return Path(__file__).parent.parent / "agents"
 
 

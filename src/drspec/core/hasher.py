@@ -1,8 +1,7 @@
 """Code hash computation for change detection.
 
-This module provides normalized SHA-256 hashing for function bodies.
-The normalization process removes whitespace variations and comments,
-ensuring that semantically identical code produces the same hash.
+Change detection hashes exact source, including literals and indentation.
+Legacy normalization helpers remain available for display only.
 """
 
 from __future__ import annotations
@@ -12,8 +11,11 @@ import re
 from typing import Callable
 
 
+HASH_STRATEGY = "exact-source:v1"
+
+
 def compute_hash(body: str, language: str) -> str:
-    """Compute SHA-256 hash of normalized function body.
+    """Compute a versioned SHA-256 hash of exact function source.
 
     Args:
         body: The function body text.
@@ -26,19 +28,36 @@ def compute_hash(body: str, language: str) -> str:
         >>> compute_hash("def foo():\\n    return 1", "python")
         'a1b2c3...'  # 64 hex characters
     """
-    normalized = normalize_code(body, language)
-    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    # Domain separation deliberately invalidates every legacy normalized hash. C is hashed as C++ (the language it was
+    # stored as before it had a label of its own), so no hash changes, and a header whose label flips (see
+    # `Scanner.label_of`) keeps its hash and its contracts.
+    language = "cpp" if language == "c" else language
+    return hashlib.sha256(("drspec:" + HASH_STRATEGY + "\0" + language + "\0" + body).encode("utf-8")).hexdigest()
+
+
+
+def compute_edge_hash(caller_hash: str, callee_hash: str, call_site: str) -> str:
+    """Compute a dependency edge's hash.
+
+    `edge_hash = sha256(caller.code_hash + callee.code_hash + call_site)` —
+    deliberately *not* normalized like `compute_hash`: `call_site` is the
+    literal call-expression text, and a different call (e.g. different
+    arguments) should change the hash even if neither function's body did.
+
+    Args:
+        caller_hash: The caller artifact's current `code_hash`.
+        callee_hash: The callee artifact's current `code_hash`.
+        call_site: The call-site text (possibly concatenated across
+            multiple call sites for the same caller/callee pair).
+
+    Returns:
+        64-character hex string (SHA-256 digest).
+    """
+    return hashlib.sha256((caller_hash + callee_hash + call_site).encode("utf-8")).hexdigest()
 
 
 def normalize_code(body: str, language: str) -> str:
-    """Normalize code for hashing.
-
-    Normalization process:
-    1. Remove comments (language-specific)
-    2. Strip leading/trailing whitespace from each line
-    3. Collapse multiple whitespace to single space
-    4. Remove empty lines
-    5. Join with single newline
+    """Normalize code for hashing: strip comments, collapse whitespace, drop empty lines.
 
     Args:
         body: The function body text.
@@ -47,28 +66,18 @@ def normalize_code(body: str, language: str) -> str:
     Returns:
         Normalized code string.
     """
-    # Get language-specific comment remover
     remove_comments = _get_comment_remover(language)
-
-    # 1. Remove comments
     code = remove_comments(body)
-
-    # 2. Split into lines
     lines = code.split("\n")
 
-    # 3. Strip whitespace from each line and collapse internal whitespace
     normalized_lines = []
     for line in lines:
-        # Strip leading/trailing whitespace
         stripped = line.strip()
-        # Collapse multiple whitespace to single space
         stripped = re.sub(r"\s+", " ", stripped)
         normalized_lines.append(stripped)
 
-    # 4. Remove empty lines
     non_empty_lines = [line for line in normalized_lines if line]
 
-    # 5. Join with single newline
     return "\n".join(non_empty_lines)
 
 
@@ -85,6 +94,8 @@ def _get_comment_remover(language: str) -> Callable[[str], str]:
         "python": _remove_python_comments,
         "javascript": _remove_c_style_comments,
         "cpp": _remove_c_style_comments,
+        "c": _remove_c_style_comments,
+        "rust": _remove_rust_comments,
     }
     return removers.get(language, _no_op_remover)
 
@@ -113,11 +124,9 @@ def _remove_python_comments(code: str) -> str:
     n = len(code)
 
     while i < n:
-        # Check for triple-quoted strings (docstrings)
         if code[i:i+3] in ('"""', "'''"):
             quote = code[i:i+3]
             i += 3
-            # Skip until closing quote
             while i < n - 2:
                 if code[i:i+3] == quote:
                     i += 3
@@ -127,14 +136,12 @@ def _remove_python_comments(code: str) -> str:
                 i = n
             continue
 
-        # Check for single-quoted strings (preserve them)
         if code[i] in ('"', "'"):
             quote_char = code[i]
             result.append(code[i])
             i += 1
             while i < n and code[i] != quote_char:
                 if code[i] == "\\" and i + 1 < n:
-                    # Handle escaped characters
                     result.append(code[i])
                     result.append(code[i + 1])
                     i += 2
@@ -142,21 +149,77 @@ def _remove_python_comments(code: str) -> str:
                     result.append(code[i])
                     i += 1
             if i < n:
-                result.append(code[i])  # closing quote
+                result.append(code[i])
                 i += 1
             continue
 
-        # Check for line comments
         if code[i] == "#":
-            # Skip until end of line
             while i < n and code[i] != "\n":
                 i += 1
             continue
 
-        # Regular character
         result.append(code[i])
         i += 1
 
+    return "".join(result)
+
+
+def _remove_rust_comments(code: str) -> str:
+    """Remove Rust comments: `//` (including `///` and `//!` doc comments) and `/* */`, which nest.
+
+    Strings are kept as they are: `"..."` with escapes and raw strings `r"..."`, `r#"..."#` (a `//` inside
+    them is text). A `'` starts a character literal only when it closes within a few characters; otherwise
+    it is a lifetime (`&'a str`) and is left alone.
+    """
+    result = []
+    i = 0
+    n = len(code)
+    while i < n:
+        char = code[i]
+        if char == "/" and code[i + 1:i + 2] == "/":
+            while i < n and code[i] != "\n":
+                i += 1
+            continue
+        if char == "/" and code[i + 1:i + 2] == "*":
+            depth = 1
+            i += 2
+            while i < n and depth:
+                if code[i:i + 2] == "/*":
+                    depth += 1
+                    i += 2
+                elif code[i:i + 2] == "*/":
+                    depth -= 1
+                    i += 2
+                else:
+                    i += 1
+            continue
+        if char == "r" and (i == 0 or not (code[i - 1].isalnum() or code[i - 1] == "_")):
+            j = i + 1
+            while j < n and code[j] == "#":
+                j += 1
+            if j < n and code[j] == '"':
+                hashes = j - i - 1
+                end = code.find('"' + "#" * hashes, j + 1)
+                end = n if end == -1 else end + 1 + hashes
+                result.append(code[i:end])
+                i = end
+                continue
+        if char == '"':
+            j = i + 1
+            while j < n and code[j] != '"':
+                j += 2 if code[j] == "\\" else 1
+            result.append(code[i:j + 1])
+            i = j + 1
+            continue
+        if char == "'":
+            closing = code.find("'", i + 2)
+            literal = code[i:closing + 1] if closing != -1 and closing - i <= 4 else ""
+            if literal and (literal[1] != "\\" or len(literal) > 3) and "\n" not in literal:
+                result.append(literal)
+                i += len(literal)
+                continue
+        result.append(char)
+        i += 1
     return "".join(result)
 
 
@@ -179,7 +242,6 @@ def _remove_c_style_comments(code: str) -> str:
     n = len(code)
 
     while i < n:
-        # Check for single-quoted strings
         if code[i] == "'":
             result.append(code[i])
             i += 1
@@ -196,7 +258,6 @@ def _remove_c_style_comments(code: str) -> str:
                 i += 1
             continue
 
-        # Check for double-quoted strings
         if code[i] == '"':
             result.append(code[i])
             i += 1
@@ -213,7 +274,6 @@ def _remove_c_style_comments(code: str) -> str:
                 i += 1
             continue
 
-        # Check for template strings (JavaScript)
         if code[i] == "`":
             result.append(code[i])
             i += 1
@@ -230,10 +290,8 @@ def _remove_c_style_comments(code: str) -> str:
                 i += 1
             continue
 
-        # Check for block comments /* */
         if i < n - 1 and code[i:i+2] == "/*":
             i += 2
-            # Skip until closing */
             while i < n - 1:
                 if code[i:i+2] == "*/":
                     i += 2
@@ -243,14 +301,11 @@ def _remove_c_style_comments(code: str) -> str:
                 i = n
             continue
 
-        # Check for line comments //
         if i < n - 1 and code[i:i+2] == "//":
-            # Skip until end of line
             while i < n and code[i] != "\n":
                 i += 1
             continue
 
-        # Regular character
         result.append(code[i])
         i += 1
 

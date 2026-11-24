@@ -1,0 +1,227 @@
+{
+ "about": "20 navigation questions about this repository (T-209). Each answer was checked with drspec before the runs (the tool named in verified_with). A run is correct when its answer matches every regex in `key` (case-insensitive). Kinds: callers, definitions, live_text, absence. Not covered: member access (no C++ in the repo) and config keys (the CI yaml files are not in the index).",
+ "instructions": {
+  "A": "drspec keeps a code graph of this project: use `search`, `deps_get` and `unused` instead of grepping for functions.\nContracts: do not write them for every function (a first scan leaves thousands PENDING). Run the contract workflow (proposer, then critic) in a sub-agent only before changing a PENDING or STALE function that has callers, when the user asks why or how a function behaves, or when a scan lists changed functions; not for VERIFIED functions with an unchanged hash, tests, one-line wrappers or generated files. One sub-agent per function (a group of at most 5), which returns the saved contract id and confidence, not the transcript. At most 5 functions per run without asking the user, at most 20 after the user says yes; then say how many PENDING and STALE functions remain instead of continuing.\nrefs_get lists the accesses whose receiver type is unknown counted by file by default (`unresolved`: files, full or count; full lists each one).\nstrings_get: who sets a YAML config key (`avoidance/timeout`) and which code reads it by name (exact string literals); a key ending with `/` lists each leaf with its value and reader; `problems: true` lists the yaml files that could not be read.\nEvery tool takes `format: \"compact\"` (the default, \"text\", is unchanged): the same data in a third fewer characters. A compact result starts with `~B` (or `~J` and the JSON of the whole result). `key: value` is a field; a value starting `{` or `[` is JSON; `note: ~I` is the usual \"Index incomplete: N of M files are not scanned yet\" note built from `index`; `~1` is the hint that searched files are not in the graph yet, `~2` the caveat that `unused` is a candidate list, not proof. `# key f1 f2..` starts function records with those fields; `>dir/` names the directory of the files below it, ` file` a file, `  name#hash<TAB>k=v..` a function in it. THE FUNCTION ID for `source_get` or `deps_get` is the directory and file of its group, `::`, then `name#hash`: `src/a/b.py::name#hash`. Unwritten fields have their default (status=\"PENDING\" possibly_stale=false has_contract=false only_test_callers=false relation=\"calls\" confidence=\"EXTRACTED\"; function_name is the last part of the name). Keys: s=signature st=status p=possibly_stale c=has_contract d=depth r=relation cf=confidence n=function_name o=only_test_callers. A signature past 80 characters ends with `…` (`source_get` has it whole). `^ hits`: under a file, `line<TAB>function<TAB>text` (`=` the row above's function, empty none, `!id` another file's). `% blocks`: `@a-b<TAB>matched lines<TAB>functions`, then lines a..b each led by `:` (matched) or `-`. `& owners`: `*Owner<TAB>count`, files, functions, then `line<TAB>kind<TAB>site<TAB>source`. `= key f1 f2..`: other lists of records, one `|cell<TAB>cell` row each (`~` a field the row lacks); a `<TAB>f=v` after a field list gives every row that value; `{ key` .. `}` holds the lists of a field; in a record `!k` means it has no `k`, and `f[a,b]` in the field list means rows of three spaces and the cells a,b follow each record. A result that does not start with `~B` is the plain text form (sent when it is the shorter). `source_get` is never compacted.",
+  "B": "Codebase navigation: drspec first. Do not use grep, rg, find or other shell text search for code when a drspec tool answers the question.\n- callers, callees, dependencies: `deps_get`\n- where a function is defined; find by name, text or meaning: `search` (`semantic: true` for meaning)\n- text of live lines, constants included: `search` with `lines: true` (the grep replacement)\n- who reads or writes a member (C++): `refs_get`\n- a yaml/config key set and read in code: `strings_get`\n- unused functions: `unused`; one function's code: `source_get`; what is indexed or stale: `status`\nShell search is for what drspec does not index (logs, build output, files outside the project) or when drspec is unavailable; an incomplete index is no reason to skip drspec. A claim that nothing calls, uses or sets something (\"no callers\", \"never used\", \"not set\") is checked with `search` in `lines` mode, not shell grep: unresolved calls and changed files can hide a use.\nContracts: do not write them for every function (a first scan leaves thousands PENDING). Run the contract workflow (proposer, then critic) in a sub-agent only before changing a PENDING or STALE function that has callers, when the user asks why or how a function behaves, or when a scan lists changed functions; not for VERIFIED functions with an unchanged hash, tests, one-line wrappers or generated files. One sub-agent per function (a group of at most 5), which returns the saved contract id and confidence, not the transcript. At most 5 functions per run without asking the user, at most 20 after the user says yes; then say how many PENDING and STALE functions remain instead of continuing.\nOutput format: `text` is the default; `format: \"compact\"` is opt-in, about a third fewer characters. A compact result starts with `~B` (or `~J` and the JSON of the whole result); one without it is text (sent when that is shorter). `key: value` a field (a value starting `{` or `[` is JSON); `note: ~I` the index note; `~1` searched files not in the graph yet; `~2` `unused` is a candidate list, not proof. `# key f1 f2..` function records with those fields; `>dir/` a directory of the files below; ` file` a file; `  name#hash<TAB>k=v..` a function. THE FUNCTION ID for `source_get` or `deps_get` is the group's directory and file, `::`, then `name#hash`: `src/a/b.py::name#hash`. Unwritten fields have their default (status=\"PENDING\" possibly_stale=false has_contract=false only_test_callers=false relation=\"calls\" confidence=\"EXTRACTED\"; function_name is the name's last part). Keys: s=signature st=status p=possibly_stale c=has_contract d=depth r=relation cf=confidence n=function_name o=only_test_callers. A signature past 80 characters ends with `…`. `^ key` hits: `line<TAB>function<TAB>text` (`=` the row above's function, empty none, `!id` another file's). `% key` blocks: `@a-b<TAB>matched lines<TAB>functions`, then lines a..b, `:` matched, `-` context. `& key` owners: `*Owner<TAB>count`, files, functions, then `line<TAB>kind<TAB>site<TAB>source`. `= key f1 f2..` other records: `|cell<TAB>cell` rows (`~` a missing field; `<TAB>f=v` gives every row that value). `{ key` .. `}` holds the lists of a field. In a record `!k` means no `k`; `f[a,b]` means rows of three spaces and cells a,b under each record. `source_get` is never compacted."
+ },
+ "questions": [
+  {
+   "id": "Q01",
+   "kind": "callers",
+   "question": "Which functions call `normalize_code` directly (depth 1)? List their names.",
+   "answer": "test_normalize_python, test_normalize_javascript, test_normalize_unknown_language, test_python_docstrings_go_too_but_a_hash_in_a_string_stays, test_legacy_hash_is_invalidated_once, and the Rust tests in test_rust_support.py.",
+   "key": [
+    "test_normalize_python",
+    "test_normalize_javascript",
+    "test_legacy_hash_is_invalidated_once"
+   ],
+   "verified_with": "deps_get normalize_code callers depth 1"
+  },
+  {
+   "id": "Q02",
+   "kind": "callers",
+   "question": "Which functions call `compute_edge_hash` directly (depth 1)? List their names.",
+   "answer": "_refresh_callee_edges, _refresh_callee_references, _sync_caller_edges, _sync_caller_references (all in src/drspec/core/graph_sync.py).",
+   "key": [
+    "_refresh_callee_edges",
+    "_refresh_callee_references",
+    "_sync_caller_edges",
+    "_sync_caller_references"
+   ],
+   "verified_with": "deps_get compute_edge_hash callers depth 1"
+  },
+  {
+   "id": "Q03",
+   "kind": "callers",
+   "question": "Which functions call `_monotonic` directly? List their names.",
+   "answer": "detection_due and run_worker, both in src/drspec/staleness_worker.py.",
+   "key": [
+    "detection_due",
+    "run_worker"
+   ],
+   "verified_with": "deps_get _monotonic callers depth 1"
+  },
+  {
+   "id": "Q04",
+   "kind": "callers",
+   "question": "What does `parse_config` in src/drspec/core/config_keys.py call directly? List the names.",
+   "answer": "_leaves and _without_opencv_directive.",
+   "key": [
+    "_leaves",
+    "_without_opencv_directive"
+   ],
+   "verified_with": "deps_get parse_config callees depth 1"
+  },
+  {
+   "id": "Q05",
+   "kind": "callers",
+   "question": "Which function in src/ (not in tests/) calls `settle_scanned_files` directly?",
+   "answer": "_remediate_queued_files, in src/drspec/staleness_worker.py.",
+   "key": [
+    "_remediate_queued_files"
+   ],
+   "verified_with": "deps_get settle_scanned_files callers depth 1, production entries only"
+  },
+  {
+   "id": "Q06",
+   "kind": "callers",
+   "question": "Which functions in src/ call `take_before` directly? List their names.",
+   "answer": "changed_since_scan, get_refs, search_command (and also deps get, strings get and their MCP tool functions).",
+   "key": [
+    "changed_since_scan",
+    "get_refs",
+    "search_command"
+   ],
+   "verified_with": "deps_get take_before callers depth 1"
+  },
+  {
+   "id": "Q07",
+   "kind": "definitions",
+   "question": "In which file is the function `get_strings` defined?",
+   "answer": "src/drspec/core/strings.py",
+   "key": [
+    "strings\\.py"
+   ],
+   "verified_with": "search pattern def get_strings, lines"
+  },
+  {
+   "id": "Q08",
+   "kind": "definitions",
+   "question": "In which file is the function `changed_since_scan` defined?",
+   "answer": "src/drspec/core/changed_notice.py",
+   "key": [
+    "changed_notice\\.py"
+   ],
+   "verified_with": "search pattern def changed_since_scan, lines"
+  },
+  {
+   "id": "Q09",
+   "kind": "definitions",
+   "question": "In which file is the function `parse_config` defined?",
+   "answer": "src/drspec/core/config_keys.py",
+   "key": [
+    "config_keys\\.py"
+   ],
+   "verified_with": "search pattern def parse_config, lines"
+  },
+  {
+   "id": "Q10",
+   "kind": "definitions",
+   "question": "In which file is the function `take_before` defined?",
+   "answer": "src/drspec/core/changed_notice.py",
+   "key": [
+    "changed_notice\\.py"
+   ],
+   "verified_with": "search pattern def take_before, lines"
+  },
+  {
+   "id": "Q11",
+   "kind": "live_text",
+   "question": "Which file assigns the module-level constant YAML_FACTS_VERSION, and what value does it hold?",
+   "answer": "src/drspec/core/facts_version.py, value \"2\".",
+   "key": [
+    "facts_version",
+    "\\b2\\b"
+   ],
+   "verified_with": "search lines YAML_FACTS_VERSION"
+  },
+  {
+   "id": "Q12",
+   "kind": "live_text",
+   "question": "Which file holds the module-level constant MAX_PREFIX_HINTS, and what is its value?",
+   "answer": "src/drspec/core/strings.py, value 3.",
+   "key": [
+    "strings\\.py",
+    "\\b3\\b"
+   ],
+   "verified_with": "search lines MAX_PREFIX_HINTS"
+  },
+  {
+   "id": "Q13",
+   "kind": "live_text",
+   "question": "In which file is the constant MAX_FUNCTIONS_PER_RUN assigned, and what value is assigned?",
+   "answer": "src/drspec/core/contract_guidance.py, value 5.",
+   "key": [
+    "contract_guidance",
+    "\\b5\\b"
+   ],
+   "verified_with": "search lines MAX_FUNCTIONS_PER_RUN"
+  },
+  {
+   "id": "Q14",
+   "kind": "live_text",
+   "question": "Which functions in src/ contain an `import yaml` line?",
+   "answer": "yaml_available and parse_config, both in src/drspec/core/config_keys.py.",
+   "key": [
+    "yaml_available",
+    "parse_config"
+   ],
+   "verified_with": "search lines import yaml"
+  },
+  {
+   "id": "Q15",
+   "kind": "live_text",
+   "question": "Which test file blocks PyYAML by setting sys.modules['yaml'] to None?",
+   "answer": "tests/unit/test_config_keys.py.",
+   "key": [
+    "test_config_keys"
+   ],
+   "verified_with": "search lines sys.modules yaml"
+  },
+  {
+   "id": "Q16",
+   "kind": "absence",
+   "question": "Is the function `_escape_string` called anywhere in this repository? Answer yes or no and name any caller.",
+   "answer": "No. It is only defined in src/drspec/contracts/generator.py; it has no caller.",
+   "key": [
+    "\\b(no|not|never|none)\\b",
+    "_escape_string"
+   ],
+   "verified_with": "deps_get callers empty; search lines: definition only"
+  },
+  {
+   "id": "Q17",
+   "kind": "absence",
+   "question": "Does any function in src/ call `format_validation_errors`? Answer yes or no.",
+   "answer": "No. It is only defined in src/drspec/contracts/validator.py and re-exported in src/drspec/contracts/__init__.py; its callers are tests only.",
+   "key": [
+    "\\b(no|not|never|none)\\b",
+    "format_validation_errors"
+   ],
+   "verified_with": "search lines src/: definition and re-export; deps only_test_callers"
+  },
+  {
+   "id": "Q18",
+   "kind": "absence",
+   "question": "Does any function in src/ call `get_latest_trace`? Answer yes or no.",
+   "answer": "No. It is defined in src/drspec/contracts/traces.py and re-exported in src/drspec/contracts/__init__.py; its callers are tests only.",
+   "key": [
+    "\\b(no|not|never|none)\\b",
+    "get_latest_trace"
+   ],
+   "verified_with": "search lines src/: definition and re-export; deps only_test_callers"
+  },
+  {
+   "id": "Q19",
+   "kind": "absence",
+   "question": "Does any function in src/ call `delete_traces`? Answer yes or no.",
+   "answer": "No. It is defined in src/drspec/contracts/traces.py and re-exported in src/drspec/contracts/__init__.py; its callers are tests only.",
+   "key": [
+    "\\b(no|not|never|none)\\b",
+    "delete_traces"
+   ],
+   "verified_with": "search lines src/: definition and re-export; deps only_test_callers"
+  },
+  {
+   "id": "Q20",
+   "kind": "absence",
+   "question": "Does any function in src/ call `get_confidence_level`? Answer yes or no.",
+   "answer": "No. It is defined in src/drspec/contracts/confidence.py and re-exported in src/drspec/contracts/__init__.py; its callers are tests only.",
+   "key": [
+    "\\b(no|not|never|none)\\b",
+    "get_confidence_level"
+   ],
+   "verified_with": "search lines src/: definition and re-export; deps only_test_callers"
+  }
+ ]
+}

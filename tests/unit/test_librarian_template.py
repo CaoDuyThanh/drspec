@@ -1,87 +1,92 @@
-"""Tests for the Librarian agent prompt template."""
+"""The Librarian agent prompt (`agents/librarian.md`): the sections an agent needs to find, the statuses it explains (against the product's list),
+the commands it hands the Librarian, and the languages it claims (against what the scanner reads). That every `drspec ...` command in it PARSES is
+`test_prompt_commands.py`'s job and is not repeated here."""
 
+import re
 
 import pytest
 
 from drspec.core.resources import get_templates_path
+from drspec.core.scanner import LANGUAGE_MAP
+from drspec.db.queries import VALID_ARTIFACT_STATUSES
+
+pytestmark = pytest.mark.unit  # reads one packaged text file
+
+#: How the prompt names each language of the scanner (`tsx` is TypeScript, `c` is read by the C++ parser).
+LANGUAGE_NAMES = {"python": "Python", "javascript": "JavaScript", "typescript": "TypeScript", "tsx": "TypeScript", "cpp": "C++", "c": "C++", "rust": "Rust"}
+
+
+@pytest.fixture(scope="module")
+def librarian_content() -> str:
+    return (get_templates_path() / "librarian.md").read_text()
+
+
+def _section(text: str, heading: str) -> str:
+    """The text under `heading` (a line like `## Workflows`) up to the next heading of the same or a higher level."""
+    level = len(heading) - len(heading.lstrip("#"))
+    match = re.search(rf"^{re.escape(heading)}\s*$(.*?)(?=^#{{1,{level}}} |\Z)", text, re.S | re.M)
+    assert match, f"no section {heading!r} in librarian.md"
+    return match.group(1)
 
 
 class TestLibrarianTemplate:
     """Tests for librarian.md template content."""
 
-    @pytest.fixture
-    def librarian_content(self) -> str:
-        """Load the librarian template content."""
-        path = get_templates_path() / "librarian.md"
-        return path.read_text()
+    def test_the_sections_an_agent_looks_for_are_there_in_this_order(self, librarian_content):
+        headings = [line for line in librarian_content.splitlines() if re.match(r"^#{1,2} ", line)]
 
-    def test_template_exists(self):
-        """Test that librarian.md exists."""
-        path = get_templates_path() / "librarian.md"
-        assert path.exists()
+        required = ["# Librarian Agent", "## Persona", "## Primary Responsibilities", "## CLI Reference", "## Workflows",
+                    "## Finding Functions That Need Contracts", "## Examples", "## Handoff Protocol"]
+        positions = [headings.index(heading) for heading in required]  # a missing section is a ValueError
+        assert positions == sorted(positions)
 
     def test_defines_persona(self, librarian_content):
-        """Test that template defines enhanced persona section."""
-        assert "## Persona" in librarian_content
-        assert "Librarian" in librarian_content
-        # Enhanced persona includes name and principles
-        assert "**Name:**" in librarian_content
-        assert "Iris" in librarian_content
-        assert "### Principles" in librarian_content
+        persona = _section(librarian_content, "## Persona")
 
-    def test_defines_responsibilities(self, librarian_content):
-        """Test that template defines primary responsibilities."""
-        assert "Scanning" in librarian_content or "scanning" in librarian_content
-        assert "Queue" in librarian_content or "queue" in librarian_content
-        assert "Status" in librarian_content or "status" in librarian_content
+        assert "**Name:** Iris" in persona
+        assert "### Principles" in persona
 
-    def test_documents_scan_command(self, librarian_content):
-        """Test that drspec scan command is documented."""
-        assert "drspec scan" in librarian_content
-        # Should have usage examples
-        assert "drspec scan ./src" in librarian_content or "drspec scan [path]" in librarian_content
+    def test_the_cli_reference_gives_the_commands_the_librarian_works_with(self, librarian_content):
+        reference = _section(librarian_content, "## CLI Reference")
 
-    def test_documents_status_command(self, librarian_content):
-        """Test that drspec status command is documented."""
-        assert "drspec status" in librarian_content
+        for command in ("drspec scan", "drspec status", "drspec search --status PENDING", "drspec search --status STALE"):
+            assert command in reference, command
 
-    def test_documents_queue_commands(self, librarian_content):
-        """Test that queue commands are documented."""
-        assert "queue peek" in librarian_content
-        assert "queue prioritize" in librarian_content or "prioritize" in librarian_content
+    def test_the_initial_workflow_runs_init_then_scan(self, librarian_content):
+        workflow = _section(librarian_content, "### Initial Scan Workflow")
 
-    def test_includes_workflow_guidance(self, librarian_content):
-        """Test that template includes workflow guidance."""
-        assert "Workflow" in librarian_content or "workflow" in librarian_content
-        # Should guide through initial scan
-        assert "init" in librarian_content
-        assert "scan" in librarian_content
+        assert 0 <= workflow.index("drspec init") < workflow.index("drspec scan")
 
-    def test_includes_examples(self, librarian_content):
-        """Test that template includes example interactions."""
-        assert "Example" in librarian_content or "## Example" in librarian_content
-        # Should have at least one user/librarian exchange
-        assert "User" in librarian_content
+    def test_every_status_the_product_has_is_explained(self, librarian_content):
+        explained = _section(librarian_content, "### Understanding Function Status")
 
-    def test_includes_handoff_protocol(self, librarian_content):
-        """Test that template includes handoff protocol."""
-        assert "Handoff" in librarian_content or "handoff" in librarian_content
-        # Should mention Architect Council
-        assert "Architect" in librarian_content or "Council" in librarian_content
+        assert set(re.findall(r"^- \*\*([A-Z_]+)\*\*:", explained, re.M)) == set(VALID_ARTIFACT_STATUSES)
 
-    def test_explains_queue_statuses(self, librarian_content):
-        """Test that queue statuses are explained."""
-        assert "PENDING" in librarian_content
-        assert "PROCESSING" in librarian_content or "Processing" in librarian_content
+    def test_work_to_do_is_pending_or_stale(self, librarian_content):
+        finding = _section(librarian_content, "## Finding Functions That Need Contracts")
 
-    def test_mentions_supported_languages(self, librarian_content):
-        """Test that supported languages are mentioned."""
-        assert "Python" in librarian_content
-        assert "JavaScript" in librarian_content or "TypeScript" in librarian_content
+        assert "drspec search --status PENDING" in finding and "drspec search --status STALE" in finding
 
-    def test_reasonable_length(self, librarian_content):
-        """Test that template is substantial enough to be useful."""
-        # Should be more than just a stub
-        assert len(librarian_content) > 2000
-        # But not unreasonably long
-        assert len(librarian_content) < 20000
+    def test_the_handoff_names_the_next_agent_and_when_to_hand_over(self, librarian_content):
+        handoff = _section(librarian_content, "## Handoff Protocol")
+
+        assert "### When to Suggest Architect Council" in handoff
+        assert "### Handoff Message" in handoff
+
+    def test_the_examples_are_dialogues_with_the_user(self, librarian_content):
+        examples = _section(librarian_content, "## Examples")
+
+        assert re.findall(r"^### ", examples, re.M)  # at least one named example
+        assert "**User**:" in examples and "**Librarian**:" in examples  # both sides of the dialogue
+
+    def test_the_languages_it_names_are_languages_the_scanner_reads(self, librarian_content):
+        line = next(line for line in librarian_content.splitlines() if line.startswith("- Supported languages:"))
+        named = set(re.split(r"[,/]\s*", line.split(":", 1)[1].strip()))
+
+        known = {LANGUAGE_NAMES[language] for language in set(LANGUAGE_MAP.values())}
+        assert named <= known, f"the prompt promises languages the scanner does not read: {named - known}"
+
+
+    def test_the_template_is_one_page_not_a_stub_or_a_manual(self, librarian_content):
+        # a size band, not a measurement: the prompt is loaded whole into an agent's context
+        assert 2000 < len(librarian_content) < 20000

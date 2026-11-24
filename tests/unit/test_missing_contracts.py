@@ -1,11 +1,4 @@
-"""Tests for missing contract detection (Story 5-5).
-
-These tests verify the missing contract detection API:
-- MissingContract and MissingContractReport models
-- detect_missing_contracts: Find functions without contracts
-- Prioritization by relationship and depth
-- Suggestion generation
-"""
+"""Tests for missing contract detection."""
 
 from __future__ import annotations
 
@@ -24,8 +17,8 @@ from drspec.db import (
     init_schema,
     insert_artifact,
     insert_contract,
-    insert_dependency,
 )
+from tests.helpers import insert_dependency
 
 
 # =============================================================================
@@ -36,7 +29,7 @@ from drspec.db import (
 @pytest.fixture
 def db_conn():
     """Create an in-memory database connection for testing."""
-    conn = get_connection(":memory:")
+    conn = get_connection(":memory:")  # pattern-ok: duckdb-file an in-memory database
     init_schema(conn)
     yield conn
     conn.close()
@@ -223,7 +216,7 @@ class TestMissingContractReport:
 
 
 # =============================================================================
-# detect_missing_contracts Tests (AC: 1, 2, 3, 4, 5, 6)
+# detect_missing_contracts Tests
 # =============================================================================
 
 
@@ -231,7 +224,6 @@ class TestDetectMissingContracts:
     """Tests for detect_missing_contracts function."""
 
     def test_detects_direct_missing(self, db_conn, sample_artifacts):
-        """Should detect when debug target lacks contract (AC: 1, 2)."""
         # No contracts added - target is missing
         report = detect_missing_contracts(db_conn, "src/main.py::process")
 
@@ -243,7 +235,6 @@ class TestDetectMissingContracts:
         assert direct[0].function_id == "src/main.py::process"
 
     def test_detects_callee_missing(self, db_conn, sample_artifacts):
-        """Should detect when callees lack contracts (AC: 3)."""
         # Add contract only for main function
         insert_contract(db_conn, "src/main.py::process", '{"invariants": []}', 0.8)
 
@@ -257,7 +248,6 @@ class TestDetectMissingContracts:
         assert any(m.function_id == "src/validate.py::validate" for m in callees)
 
     def test_detects_transitive_missing(self, db_conn, sample_artifacts):
-        """Should detect transitive callees (AC: 3)."""
         # Add contracts for main and validate
         insert_contract(db_conn, "src/main.py::process", '{"invariants": []}', 0.8)
         insert_contract(db_conn, "src/validate.py::validate", '{"invariants": []}', 0.7)
@@ -270,7 +260,6 @@ class TestDetectMissingContracts:
         assert any(m.function_id == "src/transform.py::transform" for m in transitive)
 
     def test_includes_function_details(self, db_conn, sample_artifacts):
-        """Should include file path and function name (AC: 4)."""
         report = detect_missing_contracts(db_conn, "src/main.py::process")
 
         for missing in report.missing_contracts:
@@ -279,14 +268,14 @@ class TestDetectMissingContracts:
             assert len(missing.reason) > 0
 
     def test_generates_suggestion(self, db_conn, sample_artifacts):
-        """Should suggest activating Architect Council (AC: 5)."""
+        """Suggestion text should mention the Architect Council."""
         report = detect_missing_contracts(db_conn, "src/main.py::process")
 
         assert len(report.suggestion) > 0
         assert "Architect Council" in report.suggestion
 
     def test_prioritizes_by_depth(self, db_conn, sample_artifacts):
-        """Should prioritize direct > callee > transitive (AC: 6)."""
+        """Priority order should be direct > callee > transitive."""
         report = detect_missing_contracts(db_conn, "src/main.py::process")
 
         # Should have multiple missing contracts

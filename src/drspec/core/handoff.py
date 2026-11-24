@@ -172,14 +172,14 @@ def create_librarian_to_architect_handoff(
     Returns:
         HandoffMessage for activating Architect Council.
     """
-    reason = f"Scan complete. {pending_count} functions queued for contract analysis."
+    reason = f"Scan complete. {pending_count} functions are waiting for a contract."
 
     action_text = (
         "To start building contracts, activate the Architect Council. "
         "The Proposer will analyze functions and debate contracts with the Critic."
     )
 
-    context: dict[str, Any] = {"queue_size": pending_count}
+    context: dict[str, Any] = {"pending_count": pending_count}
 
     if highest_priority_id:
         context["suggested_start"] = highest_priority_id

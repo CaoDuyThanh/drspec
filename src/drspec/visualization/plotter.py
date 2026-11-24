@@ -108,29 +108,23 @@ def _detect_plot_type(data: dict[str, Any]) -> str:
     Returns:
         Plot type: 'line', 'scatter', or 'bar'.
     """
-    # Bar chart: has categories and values
     if "categories" in data and "values" in data:
         return "bar"
 
-    # Check if we have x and y data
     x = data.get("x", [])
     y = data.get("y", [])
 
     if not x or not y:
-        # Default to bar if we can't determine
         return "bar"
 
-    # If x values are all integers and sequential, use line plot
     if all(isinstance(v, int) for v in x):
         sorted_x = sorted(x)
         if sorted_x == list(range(sorted_x[0], sorted_x[-1] + 1)):
             return "line"
 
-    # If there are many data points, use scatter
     if len(x) > 20:
         return "scatter"
 
-    # Default to line for small datasets
     return "line"
 
 
@@ -170,7 +164,6 @@ def generate_line_plot(
     if len(x) != len(y):
         raise ValueError(f"x and y must have same length: {len(x)} vs {len(y)}")
 
-    # Apply style
     with plt.rc_context(DRSPEC_STYLE):
         fig, ax = plt.subplots()
 
@@ -187,7 +180,6 @@ def generate_line_plot(
         ax.legend()
         ax.grid(True, alpha=0.3)
 
-        # Save plot
         output_path = _save_plot(fig, data, "line", output_dir)
         data_points = len(x)
 
@@ -233,13 +225,11 @@ def generate_scatter_plot(
     if len(x) != len(y):
         raise ValueError(f"x and y must have same length: {len(x)} vs {len(y)}")
 
-    # Apply style
     with plt.rc_context(DRSPEC_STYLE):
         fig, ax = plt.subplots()
 
         ax.scatter(x, y, color=PLOT_COLORS[0], s=50, alpha=0.7)
 
-        # Add point labels if provided
         labels = data.get("labels", [])
         if labels and len(labels) == len(x):
             for i, label in enumerate(labels):
@@ -260,7 +250,6 @@ def generate_scatter_plot(
 
         ax.grid(True, alpha=0.3)
 
-        # Save plot
         output_path = _save_plot(fig, data, "scatter", output_dir)
         data_points = len(x)
 
@@ -308,11 +297,9 @@ def generate_bar_chart(
             f"categories and values must have same length: {len(categories)} vs {len(values)}"
         )
 
-    # Apply style
     with plt.rc_context(DRSPEC_STYLE):
         fig, ax = plt.subplots()
 
-        # Use colors cycling for bars
         colors = [PLOT_COLORS[i % len(PLOT_COLORS)] for i in range(len(categories))]
         ax.bar(categories, values, color=colors, alpha=0.8)
 
@@ -325,13 +312,11 @@ def generate_bar_chart(
 
         ax.grid(True, alpha=0.3, axis="y")
 
-        # Rotate x labels if many categories
         if len(categories) > 5:
             plt.xticks(rotation=45, ha="right")
 
         plt.tight_layout()
 
-        # Save plot
         output_path = _save_plot(fig, data, "bar", output_dir)
         data_points = len(categories)
 
@@ -407,15 +392,12 @@ def _save_plot(
     Returns:
         Absolute path to saved plot file.
     """
-    # Create output directory if needed
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Generate deterministic filename
     filename = generate_plot_filename(data, plot_type)
     filepath = output_path / filename
 
-    # Save the figure
     fig.savefig(filepath, dpi=DEFAULT_DPI, bbox_inches="tight", facecolor="white")
 
     return str(filepath.resolve())

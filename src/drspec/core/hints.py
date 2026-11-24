@@ -112,6 +112,7 @@ LANGUAGE_PATTERNS = {
     "typescript": JS_PATTERNS,
     "cpp": CPP_PATTERNS,
     "c": CPP_PATTERNS,
+    "rust": CPP_PATTERNS,
 }
 
 
@@ -134,7 +135,7 @@ def _normalize_hint_type(type_str: str) -> HintType:
     elif type_lower == "requires":
         return HintType.REQUIRES
     else:
-        return HintType.INVARIANT  # Default fallback
+        return HintType.INVARIANT
 
 
 def extract_hints(
@@ -159,11 +160,9 @@ def extract_hints(
     hints = []
     lines = body.split("\n")
 
-    # Get patterns for language (or all if not specified)
     if language and language.lower() in LANGUAGE_PATTERNS:
         patterns = LANGUAGE_PATTERNS[language.lower()]
     else:
-        # Use all patterns when language not specified
         patterns = PYTHON_PATTERNS + JS_PATTERNS
 
     for i, line in enumerate(lines):
@@ -183,17 +182,14 @@ def extract_hints(
                     )
                 )
 
-    # Remove duplicates (same line and normalized text)
-    # The text may differ slightly due to pattern matching, so we normalize
+    # Multiple patterns can match the same hint with trailing */ or whitespace left in; dedupe on normalized text.
     seen = set()
     unique_hints = []
     for hint in hints:
-        # Normalize text by removing trailing */ and extra whitespace
         normalized_text = hint.text.rstrip().rstrip("*/").rstrip()
         key = (hint.line, normalized_text)
         if key not in seen:
             seen.add(key)
-            # Use the hint with cleaner text
             if hint.text != normalized_text:
                 hint = Hint(
                     line=hint.line,

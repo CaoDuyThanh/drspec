@@ -1,11 +1,4 @@
-"""Tests for root cause line reporter (Story 5-4).
-
-These tests verify the root cause analysis API:
-- RootCauseCandidate and RootCauseReport models
-- identify_root_cause: Analyze source for root cause
-- Code snippet extraction
-- Source freshness checking
-"""
+"""Tests for root cause line reporting."""
 
 from __future__ import annotations
 
@@ -218,7 +211,7 @@ class TestRootCauseReport:
 
 
 # =============================================================================
-# identify_root_cause Tests (AC: 1, 2, 3, 4, 5, 6)
+# identify_root_cause Tests
 # =============================================================================
 
 
@@ -226,7 +219,6 @@ class TestIdentifyRootCause:
     """Tests for identify_root_cause function."""
 
     def test_identifies_duplicate_root_cause(self):
-        """Should identify root cause for duplicate violation (AC: 1, 2)."""
         violation = ViolationDetail(
             invariant_name="no_duplicates",
             invariant_logic="All transaction IDs must be unique",
@@ -266,7 +258,6 @@ class TestIdentifyRootCause:
         assert report.primary_candidate is not None
 
     def test_includes_explanation(self):
-        """Should include explanation for root cause (AC: 3)."""
         violation = ViolationDetail(
             invariant_name="no_duplicates",
             invariant_logic="Unique IDs",
@@ -284,7 +275,6 @@ class TestIdentifyRootCause:
             assert len(report.primary_candidate.explanation) > 0
 
     def test_multiple_candidates(self):
-        """Should return multiple potential root causes (AC: 4)."""
         violation = ViolationDetail(
             invariant_name="no_duplicates",
             invariant_logic="Unique IDs required",
@@ -302,7 +292,6 @@ class TestIdentifyRootCause:
         assert len(report.all_candidates) >= 1
 
     def test_includes_code_snippet(self):
-        """Should include code snippet around root cause (AC: 5)."""
         violation = ViolationDetail(
             invariant_name="not_null",
             invariant_logic="Not null",
@@ -322,7 +311,6 @@ class TestIdentifyRootCause:
             assert any(c.isdigit() for c in report.primary_candidate.code_snippet)
 
     def test_checks_source_freshness(self):
-        """Should check source hash for freshness (AC: 6)."""
         violation = ViolationDetail(
             invariant_name="test",
             invariant_logic="logic",

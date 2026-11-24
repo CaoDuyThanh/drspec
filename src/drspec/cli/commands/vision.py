@@ -8,7 +8,8 @@ from typing import Optional
 import typer
 
 from drspec.cli.output import ErrorCode, error_response, output, success_response
-from drspec.db import get_connection
+from drspec.cli.validators import resolve_or_exit
+from drspec.worker_ipc import WorkerIPCError, get_worker_connection
 
 app = typer.Typer(
     name="vision",
@@ -66,38 +67,37 @@ def save(
         drspec vision save "src/foo.py::process" -t outlier -s HIGH -d "Unexpected spike at x=5"
         drspec vision save "src/foo.py::process" -t discontinuity -s MEDIUM -d "Gap in data" -l "x: 100-150"
     """
-    # Get CLI context
     cli_ctx = ctx.obj or {}
-    json_output = cli_ctx.get("json_output", True)
-    pretty = cli_ctx.get("pretty", False)
+    json_output = cli_ctx.get("json_output", False)
     db_path_override = cli_ctx.get("db_path")
 
-    # Check if database exists
     drspec_dir = Path.cwd() / "_drspec"
     if db_path_override:
         db_path = db_path_override
     else:
         db_path = drspec_dir / "contracts.db"
 
-    if not db_path.parent.exists():
+    if not db_path.parent.exists() or not db_path.exists():
         response = error_response(
             ErrorCode.DB_NOT_INITIALIZED,
             "DrSpec not initialized. Run 'drspec init' first.",
             {"expected_path": str(drspec_dir)},
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
 
     try:
-        conn = get_connection(db_path)
-    except FileNotFoundError:
+        conn = get_worker_connection(db_path)
+    except WorkerIPCError as e:
         response = error_response(
-            ErrorCode.DB_NOT_INITIALIZED,
-            "DrSpec not initialized. Run 'drspec init' first.",
+            ErrorCode.DATABASE_BUSY,
+            f"Could not reach the drspec worker: {e}",
             {"db_path": str(db_path)},
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
+
+    function_id = resolve_or_exit(conn, function_id, json_output)
 
     try:
         from drspec.db.queries import insert_vision_finding
@@ -122,14 +122,14 @@ def save(
         }
 
         response = success_response(data)
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
 
     except ValueError as e:
         response = error_response(
             ErrorCode.INVALID_INPUT,
             str(e),
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
     except typer.Exit:
         raise
@@ -138,7 +138,7 @@ def save(
             ErrorCode.INTERNAL_ERROR,
             f"Error saving finding: {str(e)}",
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
     finally:
         conn.close()
@@ -177,38 +177,38 @@ def list_findings(
         drspec vision list --function "src/foo.py::process"
         drspec vision list --status NEW --significance HIGH
     """
-    # Get CLI context
     cli_ctx = ctx.obj or {}
-    json_output = cli_ctx.get("json_output", True)
-    pretty = cli_ctx.get("pretty", False)
+    json_output = cli_ctx.get("json_output", False)
     db_path_override = cli_ctx.get("db_path")
 
-    # Check if database exists
     drspec_dir = Path.cwd() / "_drspec"
     if db_path_override:
         db_path = db_path_override
     else:
         db_path = drspec_dir / "contracts.db"
 
-    if not db_path.parent.exists():
+    if not db_path.parent.exists() or not db_path.exists():
         response = error_response(
             ErrorCode.DB_NOT_INITIALIZED,
             "DrSpec not initialized. Run 'drspec init' first.",
             {"expected_path": str(drspec_dir)},
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
 
     try:
-        conn = get_connection(db_path)
-    except FileNotFoundError:
+        conn = get_worker_connection(db_path, read_only=True)
+    except WorkerIPCError as e:
         response = error_response(
-            ErrorCode.DB_NOT_INITIALIZED,
-            "DrSpec not initialized. Run 'drspec init' first.",
+            ErrorCode.DATABASE_BUSY,
+            f"Could not reach the drspec worker: {e}",
             {"db_path": str(db_path)},
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
+
+    if function_id:
+        function_id = resolve_or_exit(conn, function_id, json_output)
 
     try:
         from drspec.db.queries import get_all_vision_findings, get_vision_findings
@@ -222,7 +222,6 @@ def list_findings(
                 conn, status=status, significance=significance, limit=limit
             )
 
-        # Apply limit if using function filter
         findings = findings[:limit]
 
         data = {
@@ -246,14 +245,14 @@ def list_findings(
         }
 
         response = success_response(data)
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
 
     except ValueError as e:
         response = error_response(
             ErrorCode.INVALID_INPUT,
             str(e),
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
     except typer.Exit:
         raise
@@ -262,7 +261,7 @@ def list_findings(
             ErrorCode.INTERNAL_ERROR,
             f"Error listing findings: {str(e)}",
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
     finally:
         conn.close()
@@ -294,37 +293,34 @@ def update(
         drspec vision update 1 --status ADDRESSED --note "Added boundary check invariant"
         drspec vision update 2 -s IGNORED -n "False positive - expected behavior"
     """
-    # Get CLI context
     cli_ctx = ctx.obj or {}
-    json_output = cli_ctx.get("json_output", True)
-    pretty = cli_ctx.get("pretty", False)
+    json_output = cli_ctx.get("json_output", False)
     db_path_override = cli_ctx.get("db_path")
 
-    # Check if database exists
     drspec_dir = Path.cwd() / "_drspec"
     if db_path_override:
         db_path = db_path_override
     else:
         db_path = drspec_dir / "contracts.db"
 
-    if not db_path.parent.exists():
+    if not db_path.parent.exists() or not db_path.exists():
         response = error_response(
             ErrorCode.DB_NOT_INITIALIZED,
             "DrSpec not initialized. Run 'drspec init' first.",
             {"expected_path": str(drspec_dir)},
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
 
     try:
-        conn = get_connection(db_path)
-    except FileNotFoundError:
+        conn = get_worker_connection(db_path)
+    except WorkerIPCError as e:
         response = error_response(
-            ErrorCode.DB_NOT_INITIALIZED,
-            "DrSpec not initialized. Run 'drspec init' first.",
+            ErrorCode.DATABASE_BUSY,
+            f"Could not reach the drspec worker: {e}",
             {"db_path": str(db_path)},
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
 
     try:
@@ -342,7 +338,7 @@ def update(
                 ErrorCode.NOT_FOUND,
                 f"Finding {finding_id} not found",
             )
-            output(response, json_output=json_output, pretty=pretty)
+            output(response, json_output=json_output)
             raise typer.Exit(1)
 
         data = {
@@ -352,14 +348,14 @@ def update(
         }
 
         response = success_response(data)
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
 
     except ValueError as e:
         response = error_response(
             ErrorCode.INVALID_INPUT,
             str(e),
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
     except typer.Exit:
         raise
@@ -368,7 +364,7 @@ def update(
             ErrorCode.INTERNAL_ERROR,
             f"Error updating finding: {str(e)}",
         )
-        output(response, json_output=json_output, pretty=pretty)
+        output(response, json_output=json_output)
         raise typer.Exit(1)
     finally:
         conn.close()

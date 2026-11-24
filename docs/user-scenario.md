@@ -115,24 +115,17 @@ Output (JSON - for agent parsing):
 {"success":true,"data":{"message":"Scanned 87 file(s), found 523 function(s)","path":"/home/alex/projects/my-webapp","recursive":true,"files_scanned":87,"functions_found":523,"functions_new":523,"functions_changed":0,"functions_unchanged":0,"queue_enabled":true},"error":null}
 ```
 
-If Alex runs it manually with `--pretty`:
+If Alex runs it by hand:
 ```bash
-drspec scan --pretty
+drspec scan
 ```
 
-Output (human-readable):
+Output (human-readable: one line for the result, with the counts that are not zero, and one line for each thing that needs attention):
 ```
-✓ Scanned 87 file(s), found 523 function(s)
+✓ Scanned 87 file(s), found 523 function(s) (new 523)
+```
 
-Path: /home/alex/projects/my-webapp
-Recursive: Yes
-Files Scanned: 87
-Functions Found: 523
-Functions New: 523
-Functions Changed: 0
-Functions Unchanged: 0
-Queue Enabled: Yes
-```
+`drspec scan --verbose` prints the whole summary instead (the settings, every counter, and every function re-read).
 
 **What happened:**
 1. Tree-sitter parsed all `.py`, `.js`, `.ts` files
@@ -146,37 +139,22 @@ Queue Enabled: Yes
 The Librarian shows project status:
 
 ```bash
-drspec status --pretty
+drspec status
 ```
 
-Output (human-readable):
+Output (human-readable: the counts, one line per block; a block with nothing in it is not printed):
 ```
-Artifacts:
-  total: 523
-  by_status:
-    PENDING: 523
-    VERIFIED: 0
-    NEEDS_REVIEW: 0
-    STALE: 0
-    BROKEN: 0
-
-Queue:
-  total: 523
-  PENDING: 523
-  PROCESSING: 0
-  COMPLETED: 0
-  FAILED: 0
-
-Contracts:
-  total: 0
-  average_confidence: 0.0%
-
-Summary:
-  items_needing_attention: 523
-  completion_rate: 0.0%
+Verification: unverified 40, passed 0, failed 0, partial 0, error 0, stale 0
+Artifacts: 40 (pending 40, stale 0, verified 0, broken 0, needs review 0)
+Items Needing Attention: 40, completion 0.0%
+Embedding: 0 of 40 embedded (top_n 2000), idle
+Python: 2 files, 0 partially parsed, 0 calls, 0 unresolved
+Cpp: 20 files, 0 partially parsed, 0 calls, 0 unresolved
+Database: 3.7 MB file, 3.4 MB used, 0.3 MB free (7.1%)
+Parsers: 11
 ```
 
-> When agents call `drspec status` (without `--pretty`), they receive JSON for parsing.
+> Agents that parse the status ask for JSON (`drspec --json status`). `drspec status --details` prints the lists as well (the partly parsed files, the largest tables).
 
 ### Step 2.4: Prioritize Critical Functions
 

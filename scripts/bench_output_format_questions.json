@@ -1,0 +1,440 @@
+{
+ "about": "Question set for the accuracy test of T-72. `result` is the position of the result in the replay; every format of it is given whole, so a question is answered from one format at a time. `answer` is worked out from the raw data. D is today's text with the dictionary in force (its legend first); B and C need `legend`; signatures over 80 characters are clipped in B and C, and no question asks for one.",
+ "tokenizer": "characters / 3.6 (tiktoken is not installed)",
+ "legend": "Every tool takes `format: \"compact\"` (the default, \"text\", is unchanged): the same data in a third fewer characters. A compact result starts with `~B` (or `~J` and the JSON of the whole result). `key: value` is a field; a value starting `{` or `[` is JSON; `note: ~I` is the usual \"Index incomplete: N of M files are not scanned yet\" note built from `index`; `~1` is the hint that searched files are not in the graph yet, `~2` the caveat that `unused` is a candidate list, not proof. `# key f1 f2..` starts function records with those fields; `>dir/` names the directory of the files below it, ` file` a file, `  name#hash<TAB>k=v..` a function in it. THE FUNCTION ID for `source_get` or `deps_get` is the directory and file of its group, `::`, then `name#hash`: `src/a/b.py::name#hash`. Unwritten fields have their default (status=\"PENDING\" possibly_stale=false has_contract=false only_test_callers=false relation=\"calls\" confidence=\"EXTRACTED\"; function_name is the last part of the name). Keys: s=signature st=status p=possibly_stale c=has_contract d=depth r=relation cf=confidence n=function_name o=only_test_callers. A signature past 80 characters ends with `…` (`source_get` has it whole). `^ hits`: under a file, `line<TAB>function<TAB>text` (`=` the row above's function, empty none, `!id` another file's). `% blocks`: `@a-b<TAB>matched lines<TAB>functions`, then lines a..b each led by `:` (matched) or `-`. `& owners`: `*Owner<TAB>count`, files, functions, then `line<TAB>kind<TAB>site<TAB>source`. `= key f1 f2..`: other lists of records, one `|cell<TAB>cell` row each (`~` a field the row lacks); a `<TAB>f=v` after a field list gives every row that value; `{ key` .. `}` holds the lists of a field; in a record `!k` means it has no `k`, and `f[a,b]` in the field list means rows of three spaces and the cells a,b follow each record. A result that does not start with `~B` is the plain text form (sent when it is the shorter). `source_get` is never compacted.",
+ "results": [
+  {
+   "result": 0,
+   "tool": "search",
+   "mode": "functions",
+   "arguments": {
+    "pattern": "resolve_calls",
+    "limit": 5
+   },
+   "formats": {
+    "A": "Pattern: resolve_calls\nSemantic: No\nFiles Searched: 271\nTotal Matches: 37\nFunction ID: <File>::<ID>\nMatches:\n  File: src/drspec/core/call_resolver.py   (1 match)\n    ID: resolve_calls#9e9e81de\n      Status: PENDING\n      Signature: def resolve_calls(fact: ResolutionInput) -> list[ResolvedCall]:\n      Possibly Stale: No\n\n  File: src/drspec/core/graph_sync.py   (1 match)\n    ID: _sync_edges#50275719\n      Status: PENDING\n      Signature: def _sync_edges( conn: duckdb.DuckDBPyConnection, callers_to_resolve: list[ScannedFunction], functions_by_file: dict[str, list[ScannedFunction]], file_imports: dict[str, FileImports], deep_scan: bool, embed: bool, stats: SyncStats, code_hash_cache: dict, infer_by_name: bool = False, ) -> None:\n      Possibly Stale: No\n\n  File: tests/unit/test_call_resolver.py   (3 matches)\n    ID: TestSameFileResolution.test_resolves_single_same_file_candidate#d9e613a7\n      Status: PENDING\n      Signature: def test_resolves_single_same_file_candidate(self):\n      Possibly Stale: No\n    ID: TestSameFileResolution.test_skips_ambiguous_same_name#d9e613a7\n      Status: PENDING\n      Signature: def test_skips_ambiguous_same_name(self):\n      Possibly Stale: No\n    ID: TestSameFileResolution.test_skips_unknown_name#d9e613a7\n      Status: PENDING\n      Signature: def test_skips_unknown_name(self):\n      Possibly Stale: No\nTruncated: Yes\nNote: Showing 5 of 37 matching functions, best match first; raise limit to see more.",
+    "B": "~B\npattern: resolve_calls\nsemantic: false\nfiles_searched: 271\ntotal_matches: 37\n# matches function_id function_name file_path status signature possibly_stale\n>src/drspec/core/\n call_resolver.py\n  resolve_calls#9e9e81de\ts=def resolve_calls(fact: ResolutionInput) -> list[ResolvedCall]:\n graph_sync.py\n  _sync_edges#50275719\ts=def _sync_edges( conn: duckdb.DuckDBPyConnection, callers_to_resolve: list[Scan…\n>tests/unit/\n test_call_resolver.py\n  TestSameFileResolution.test_resolves_single_same_file_candidate#d9e613a7\ts=def test_resolves_single_same_file_candidate(self):\n  TestSameFileResolution.test_skips_ambiguous_same_name#d9e613a7\ts=def test_skips_ambiguous_same_name(self):\n  TestSameFileResolution.test_skips_unknown_name#d9e613a7\ts=def test_skips_unknown_name(self):\ntruncated: true\nnote: Showing 5 of 37 matching functions, best match first; raise limit to see more.",
+    "C": "~B\npattern: resolve_calls\nsemantic: false\nfiles_searched: 271\ntotal_matches: 37\n# matches function_id function_name file_path status signature possibly_stale\n>src/drspec/core/\n call_resolver.py\n  resolve_calls#9e9e81de\ts=def resolve_calls(fact: ResolutionInput) -> list[ResolvedCall]:\n graph_sync.py\n  _sync_edges#50275719\ts=def _sync_edges( conn: duckdb.DuckDBPyConnection, callers_to_resolve: list[Scan…\n>tests/unit/\n test_call_resolver.py\n  TestSameFileResolution.test_resolves_single_same_file_candidate#d9e613a7\ts=def test_resolves_single_same_file_candidate(self):\n  TestSameFileResolution.test_skips_ambiguous_same_name#d9e613a7\ts=def test_skips_ambiguous_same_name(self):\n  TestSameFileResolution.test_skips_unknown_name#d9e613a7\ts=def test_skips_unknown_name(self):\ntruncated: true\nnote: Showing 5 of 37 matching functions, best match first; raise limit to see more.",
+    "D": "Pattern: resolve_calls\nSemantic: No\nFiles Searched: 271\nTotal Matches: 37\nFunction ID: <File>::<ID>\nMatches:\n  File: src/drspec/core/call_resolver.py   (1 match)\n    ID: resolve_calls#9e9e81de\n      Status: PENDING\n      Signature: def resolve_calls(fact: ResolutionInput) -> list[ResolvedCall]:\n      Possibly Stale: No\n\n  File: src/drspec/core/graph_sync.py   (1 match)\n    ID: _sync_edges#50275719\n      Status: PENDING\n      Signature: def _sync_edges( conn: duckdb.DuckDBPyConnection, callers_to_resolve: list[ScannedFunction], functions_by_file: dict[str, list[ScannedFunction]], file_imports: dict[str, FileImports], deep_scan: bool, embed: bool, stats: SyncStats, code_hash_cache: dict, infer_by_name: bool = False, ) -> None:\n      Possibly Stale: No\n\n  File: tests/unit/test_call_resolver.py   (3 matches)\n    ID: TestSameFileResolution.test_resolves_single_same_file_candidate#d9e613a7\n      Status: PENDING\n      Signature: def test_resolves_single_same_file_candidate(self):\n      Possibly Stale: No\n    ID: TestSameFileResolution.test_skips_ambiguous_same_name#d9e613a7\n      Status: PENDING\n      Signature: def test_skips_ambiguous_same_name(self):\n      Possibly Stale: No\n    ID: TestSameFileResolution.test_skips_unknown_name#d9e613a7\n      Status: PENDING\n      Signature: def test_skips_unknown_name(self):\n      Possibly Stale: No\nTruncated: Yes\nNote: Showing 5 of 37 matching functions, best match first; raise limit to see more."
+   }
+  },
+  {
+   "result": 2,
+   "tool": "deps_get",
+   "mode": "-",
+   "arguments": {
+    "function_id": "src/drspec/core/hasher.py::compute_edge_hash",
+    "direction": "callers",
+    "depth": 2
+   },
+   "formats": {
+    "A": "ID: src/drspec/core/hasher.py::compute_edge_hash#01757ca4\nName: compute_edge_hash\nFile: src/drspec/core/hasher.py\nStatus: PENDING\nPossibly Stale: No\nDepth: 2\nDirection: callers\nCallees:\nFunction ID: <File>::<ID>\nCallers:\n  File: src/drspec/core/graph_sync.py   (6 functions)\n    <--calls-- _refresh_callee_edges#70dea28e\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- _refresh_callee_references#70dea28e\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- _sync_caller_edges#f71ec04f\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- _sync_caller_references#979ed394\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- _sync_edges#50275719\n      Depth: 2\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- _sync_references#2d2d5f91\n      Depth: 2\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No",
+    "B": "~B\nfunction_id: src/drspec/core/hasher.py::compute_edge_hash#01757ca4\nfunction_name: compute_edge_hash\nfile_path: src/drspec/core/hasher.py\nstatus: PENDING\npossibly_stale: false\ndepth: 2\ndirection: callers\ncallees: []\n# callers function_id function_name file_path depth relation confidence has_contract status possibly_stale\n>src/drspec/core/\n graph_sync.py\n  _refresh_callee_edges#70dea28e\td=1\n  _refresh_callee_references#70dea28e\td=1\n  _sync_caller_edges#f71ec04f\td=1\n  _sync_caller_references#979ed394\td=1\n  _sync_edges#50275719\td=2\n  _sync_references#2d2d5f91\td=2",
+    "C": "~B\nfunction_id: src/drspec/core/hasher.py::compute_edge_hash#01757ca4\nfunction_name: compute_edge_hash\nfile_path: src/drspec/core/hasher.py\nstatus: PENDING\npossibly_stale: false\ndepth: 2\ndirection: callers\ncallees: []\n# callers function_id function_name file_path depth relation confidence has_contract status possibly_stale\n>src/drspec/core/\n graph_sync.py\n  _refresh_callee_edges#70dea28e\td=1\n  _refresh_callee_references#70dea28e\td=1\n  _sync_caller_edges#f71ec04f\td=1\n  _sync_caller_references#979ed394\td=1\n  _sync_edges#50275719\td=2\n  _sync_references#2d2d5f91\td=2",
+    "D": "ID: src/drspec/core/hasher.py::compute_edge_hash#01757ca4\nName: compute_edge_hash\nFile: src/drspec/core/hasher.py\nStatus: PENDING\nPossibly Stale: No\nDepth: 2\nDirection: callers\nCallees:\nFunction ID: <File>::<ID>\nCallers:\n  File: src/drspec/core/graph_sync.py   (6 functions)\n    <--calls-- _refresh_callee_edges#70dea28e\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- _refresh_callee_references#70dea28e\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- _sync_caller_edges#f71ec04f\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- _sync_caller_references#979ed394\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- _sync_edges#50275719\n      Depth: 2\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- _sync_references#2d2d5f91\n      Depth: 2\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No"
+   }
+  },
+  {
+   "result": 3,
+   "tool": "deps_get",
+   "mode": "-",
+   "arguments": {
+    "function_id": "src/drspec/core/hasher.py::normalize_code",
+    "direction": "callers",
+    "depth": 3
+   },
+   "formats": {
+    "A": "ID: src/drspec/core/hasher.py::normalize_code#2f34545b\nName: normalize_code\nFile: src/drspec/core/hasher.py\nStatus: PENDING\nPossibly Stale: No\nDepth: 3\nDirection: callers\nCallees:\nFunction ID: <File>::<ID>\nCallers:\n  File: tests/unit/test_feedback_regressions.py   (1 function)\n    <--calls-- test_legacy_hash_is_invalidated_once#eedfc912\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n\n  File: tests/unit/test_hasher.py   (4 functions)\n    <--calls-- TestNormalizeCode.test_normalize_javascript#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_normalize_python#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_normalize_unknown_language#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_python_docstrings_go_too_but_a_hash_in_a_string_stays#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n\n  File: tests/unit/test_rust_support.py   (3 functions)\n    <--calls-- TestHashing.test_a_comment_marker_inside_a_string_is_text#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestHashing.test_comments_do_not_change_the_normalised_text#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestHashing.test_lifetimes_are_not_character_literals#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No",
+    "B": "~B\nfunction_id: src/drspec/core/hasher.py::normalize_code#2f34545b\nfunction_name: normalize_code\nfile_path: src/drspec/core/hasher.py\nstatus: PENDING\npossibly_stale: false\ndepth: 3\ndirection: callers\ncallees: []\n# callers function_id function_name file_path depth relation confidence has_contract status possibly_stale\td=1\n>tests/unit/\n test_feedback_regressions.py\n  test_legacy_hash_is_invalidated_once#eedfc912\n test_hasher.py\n  TestNormalizeCode.test_normalize_javascript#d9e613a7\n  TestNormalizeCode.test_normalize_python#d9e613a7\n  TestNormalizeCode.test_normalize_unknown_language#d9e613a7\n  TestNormalizeCode.test_python_docstrings_go_too_but_a_hash_in_a_string_stays#d9e613a7\n test_rust_support.py\n  TestHashing.test_a_comment_marker_inside_a_string_is_text#d9e613a7\n  TestHashing.test_comments_do_not_change_the_normalised_text#d9e613a7\n  TestHashing.test_lifetimes_are_not_character_literals#d9e613a7",
+    "C": "~B\nfunction_id: src/drspec/core/hasher.py::normalize_code#2f34545b\nfunction_name: normalize_code\nfile_path: src/drspec/core/hasher.py\nstatus: PENDING\npossibly_stale: false\ndepth: 3\ndirection: callers\ncallees: []\n# callers function_id function_name file_path depth relation confidence has_contract status possibly_stale\td=1\n>tests/unit/\n test_feedback_regressions.py\n  test_legacy_hash_is_invalidated_once#eedfc912\n test_hasher.py\n  TestNormalizeCode.test_normalize_javascript#d9e613a7\n  TestNormalizeCode.test_normalize_python#d9e613a7\n  TestNormalizeCode.test_normalize_unknown_language#d9e613a7\n  TestNormalizeCode.test_python_docstrings_go_too_but_a_hash_in_a_string_stays#d9e613a7\n test_rust_support.py\n  TestHashing.test_a_comment_marker_inside_a_string_is_text#d9e613a7\n  TestHashing.test_comments_do_not_change_the_normalised_text#d9e613a7\n  TestHashing.test_lifetimes_are_not_character_literals#d9e613a7",
+    "D": "ID: src/drspec/core/hasher.py::normalize_code#2f34545b\nName: normalize_code\nFile: src/drspec/core/hasher.py\nStatus: PENDING\nPossibly Stale: No\nDepth: 3\nDirection: callers\nCallees:\nFunction ID: <File>::<ID>\nCallers:\n  File: tests/unit/test_feedback_regressions.py   (1 function)\n    <--calls-- test_legacy_hash_is_invalidated_once#eedfc912\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n\n  File: tests/unit/test_hasher.py   (4 functions)\n    <--calls-- TestNormalizeCode.test_normalize_javascript#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_normalize_python#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_normalize_unknown_language#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_python_docstrings_go_too_but_a_hash_in_a_string_stays#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n\n  File: tests/unit/test_rust_support.py   (3 functions)\n    <--calls-- TestHashing.test_a_comment_marker_inside_a_string_is_text#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestHashing.test_comments_do_not_change_the_normalised_text#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestHashing.test_lifetimes_are_not_character_literals#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No"
+   }
+  },
+  {
+   "result": 5,
+   "tool": "deps_get",
+   "mode": "-",
+   "arguments": {
+    "function_id": "src/drspec/core/hasher.py::_get_comment_remover",
+    "direction": "callers"
+   },
+   "formats": {
+    "A": "ID: src/drspec/core/hasher.py::_get_comment_remover#fd54a76a\nName: _get_comment_remover\nFile: src/drspec/core/hasher.py\nStatus: PENDING\nPossibly Stale: No\nDepth: 1\nDirection: callers\nCallees:\nFunction ID: <File>::<ID>\nCallers:\n  File: src/drspec/core/hasher.py   (1 function)\n    <--calls-- normalize_code#2f34545b\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No",
+    "B": "~B\nfunction_id: src/drspec/core/hasher.py::_get_comment_remover#fd54a76a\nfunction_name: _get_comment_remover\nfile_path: src/drspec/core/hasher.py\nstatus: PENDING\npossibly_stale: false\ndepth: 1\ndirection: callers\ncallees: []\n# callers function_id function_name file_path depth relation confidence has_contract status possibly_stale\n>src/drspec/core/\n hasher.py\n  normalize_code#2f34545b\td=1",
+    "C": "~B\nfunction_id: src/drspec/core/hasher.py::_get_comment_remover#fd54a76a\nfunction_name: _get_comment_remover\nfile_path: src/drspec/core/hasher.py\nstatus: PENDING\npossibly_stale: false\ndepth: 1\ndirection: callers\ncallees: []\n# callers function_id function_name file_path depth relation confidence has_contract status possibly_stale\n>src/drspec/core/\n hasher.py\n  normalize_code#2f34545b\td=1",
+    "D": "ID: src/drspec/core/hasher.py::_get_comment_remover#fd54a76a\nName: _get_comment_remover\nFile: src/drspec/core/hasher.py\nStatus: PENDING\nPossibly Stale: No\nDepth: 1\nDirection: callers\nCallees:\nFunction ID: <File>::<ID>\nCallers:\n  File: src/drspec/core/hasher.py   (1 function)\n    <--calls-- normalize_code#2f34545b\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No"
+   }
+  },
+  {
+   "result": 11,
+   "tool": "search",
+   "mode": "functions",
+   "arguments": {
+    "pattern": "_UNUSED_WHERE"
+   },
+   "formats": {
+    "A": "Pattern: _UNUSED_WHERE\nSemantic: No\nFiles Searched: 271\nTotal Matches: 2\nFunction ID: <File>::<ID>\nMatches:\n  File: src/drspec/db/queries.py   (2 matches)\n    ID: list_unused_artifacts#10f0380c\n      Status: PENDING\n      Signature: def list_unused_artifacts( conn: duckdb.DuckDBPyConnection, path_prefix: Optional[str] = None, limit: int = 100, ) -> list[Artifact]:\n      Possibly Stale: No\n    ID: count_unused_artifacts#fac18e83\n      Status: PENDING\n      Signature: def count_unused_artifacts( conn: duckdb.DuckDBPyConnection, path_prefix: Optional[str] = None, ) -> int:\n      Possibly Stale: No\nTruncated: No",
+    "B": "~B\npattern: _UNUSED_WHERE\nsemantic: false\nfiles_searched: 271\ntotal_matches: 2\n# matches function_id function_name file_path status signature possibly_stale\n>src/drspec/db/\n queries.py\n  list_unused_artifacts#10f0380c\ts=def list_unused_artifacts( conn: duckdb.DuckDBPyConnection, path_prefix: Option…\n  count_unused_artifacts#fac18e83\ts=def count_unused_artifacts( conn: duckdb.DuckDBPyConnection, path_prefix: Optio…\ntruncated: false",
+    "C": "~B\npattern: _UNUSED_WHERE\nsemantic: false\nfiles_searched: 271\ntotal_matches: 2\n# matches function_id function_name file_path status signature possibly_stale\n>src/drspec/db/\n queries.py\n  list_unused_artifacts#10f0380c\ts=def list_unused_artifacts( conn: duckdb.DuckDBPyConnection, path_prefix: Option…\n  count_unused_artifacts#fac18e83\ts=def count_unused_artifacts( conn: duckdb.DuckDBPyConnection, path_prefix: Optio…\ntruncated: false",
+    "D": "Pattern: _UNUSED_WHERE\nSemantic: No\nFiles Searched: 271\nTotal Matches: 2\nFunction ID: <File>::<ID>\nMatches:\n  File: src/drspec/db/queries.py   (2 matches)\n    ID: list_unused_artifacts#10f0380c\n      Status: PENDING\n      Signature: def list_unused_artifacts( conn: duckdb.DuckDBPyConnection, path_prefix: Optional[str] = None, limit: int = 100, ) -> list[Artifact]:\n      Possibly Stale: No\n    ID: count_unused_artifacts#fac18e83\n      Status: PENDING\n      Signature: def count_unused_artifacts( conn: duckdb.DuckDBPyConnection, path_prefix: Optional[str] = None, ) -> int:\n      Possibly Stale: No\nTruncated: No"
+   }
+  },
+  {
+   "result": 12,
+   "tool": "deps_get",
+   "mode": "-",
+   "arguments": {
+    "function_id": "src/drspec/core/hasher.py::normalize_code",
+    "direction": "callers",
+    "depth": 2
+   },
+   "formats": {
+    "A": "ID: src/drspec/core/hasher.py::normalize_code#2f34545b\nName: normalize_code\nFile: src/drspec/core/hasher.py\nStatus: PENDING\nPossibly Stale: No\nDepth: 2\nDirection: callers\nCallees:\nFunction ID: <File>::<ID>\nCallers:\n  File: tests/unit/test_feedback_regressions.py   (1 function)\n    <--calls-- test_legacy_hash_is_invalidated_once#eedfc912\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n\n  File: tests/unit/test_hasher.py   (4 functions)\n    <--calls-- TestNormalizeCode.test_normalize_javascript#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_normalize_python#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_normalize_unknown_language#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_python_docstrings_go_too_but_a_hash_in_a_string_stays#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n\n  File: tests/unit/test_rust_support.py   (3 functions)\n    <--calls-- TestHashing.test_a_comment_marker_inside_a_string_is_text#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestHashing.test_comments_do_not_change_the_normalised_text#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestHashing.test_lifetimes_are_not_character_literals#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No",
+    "B": "~B\nfunction_id: src/drspec/core/hasher.py::normalize_code#2f34545b\nfunction_name: normalize_code\nfile_path: src/drspec/core/hasher.py\nstatus: PENDING\npossibly_stale: false\ndepth: 2\ndirection: callers\ncallees: []\n# callers function_id function_name file_path depth relation confidence has_contract status possibly_stale\td=1\n>tests/unit/\n test_feedback_regressions.py\n  test_legacy_hash_is_invalidated_once#eedfc912\n test_hasher.py\n  TestNormalizeCode.test_normalize_javascript#d9e613a7\n  TestNormalizeCode.test_normalize_python#d9e613a7\n  TestNormalizeCode.test_normalize_unknown_language#d9e613a7\n  TestNormalizeCode.test_python_docstrings_go_too_but_a_hash_in_a_string_stays#d9e613a7\n test_rust_support.py\n  TestHashing.test_a_comment_marker_inside_a_string_is_text#d9e613a7\n  TestHashing.test_comments_do_not_change_the_normalised_text#d9e613a7\n  TestHashing.test_lifetimes_are_not_character_literals#d9e613a7",
+    "C": "~B\nfunction_id: src/drspec/core/hasher.py::normalize_code#2f34545b\nfunction_name: normalize_code\nfile_path: src/drspec/core/hasher.py\nstatus: PENDING\npossibly_stale: false\ndepth: 2\ndirection: callers\ncallees: []\n# callers function_id function_name file_path depth relation confidence has_contract status possibly_stale\td=1\n>tests/unit/\n test_feedback_regressions.py\n  test_legacy_hash_is_invalidated_once#eedfc912\n test_hasher.py\n  TestNormalizeCode.test_normalize_javascript#d9e613a7\n  TestNormalizeCode.test_normalize_python#d9e613a7\n  TestNormalizeCode.test_normalize_unknown_language#d9e613a7\n  TestNormalizeCode.test_python_docstrings_go_too_but_a_hash_in_a_string_stays#d9e613a7\n test_rust_support.py\n  TestHashing.test_a_comment_marker_inside_a_string_is_text#d9e613a7\n  TestHashing.test_comments_do_not_change_the_normalised_text#d9e613a7\n  TestHashing.test_lifetimes_are_not_character_literals#d9e613a7",
+    "D": "ID: src/drspec/core/hasher.py::normalize_code#2f34545b\nName: normalize_code\nFile: src/drspec/core/hasher.py\nStatus: PENDING\nPossibly Stale: No\nDepth: 2\nDirection: callers\nCallees:\nFunction ID: <File>::<ID>\nCallers:\n  File: tests/unit/test_feedback_regressions.py   (1 function)\n    <--calls-- test_legacy_hash_is_invalidated_once#eedfc912\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n\n  File: tests/unit/test_hasher.py   (4 functions)\n    <--calls-- TestNormalizeCode.test_normalize_javascript#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_normalize_python#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_normalize_unknown_language#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestNormalizeCode.test_python_docstrings_go_too_but_a_hash_in_a_string_stays#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n\n  File: tests/unit/test_rust_support.py   (3 functions)\n    <--calls-- TestHashing.test_a_comment_marker_inside_a_string_is_text#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestHashing.test_comments_do_not_change_the_normalised_text#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No\n    <--calls-- TestHashing.test_lifetimes_are_not_character_literals#d9e613a7\n      Depth: 1\n      Confidence: EXTRACTED\n      Has Contract: No\n      Status: PENDING\n      Possibly Stale: No"
+   }
+  },
+  {
+   "result": 13,
+   "tool": "search",
+   "mode": "functions",
+   "arguments": {
+    "pattern": "DEFAULT_IGNORES"
+   },
+   "formats": {
+    "A": "Pattern: DEFAULT_IGNORES\nSemantic: No\nFiles Searched: 271\nTotal Matches: 1\nFunction ID: <File>::<ID>\nMatches:\n  File: src/drspec/core/scanner.py   (1 match)\n    ID: Scanner.__init__#f3edceab\n      Status: PENDING\n      Signature: def __init__(self, ignore_patterns: Optional[list[str]] = None) -> None:\n      Possibly Stale: No\nTruncated: No",
+    "B": "~B\npattern: DEFAULT_IGNORES\nsemantic: false\nfiles_searched: 271\ntotal_matches: 1\n# matches function_id function_name file_path status signature possibly_stale\n>src/drspec/core/\n scanner.py\n  Scanner.__init__#f3edceab\ts=def __init__(self, ignore_patterns: Optional[list[str]] = None) -> None:\ntruncated: false",
+    "C": "~B\npattern: DEFAULT_IGNORES\nsemantic: false\nfiles_searched: 271\ntotal_matches: 1\n# matches function_id function_name file_path status signature possibly_stale\n>src/drspec/core/\n scanner.py\n  Scanner.__init__#f3edceab\ts=def __init__(self, ignore_patterns: Optional[list[str]] = None) -> None:\ntruncated: false",
+    "D": "Pattern: DEFAULT_IGNORES\nSemantic: No\nFiles Searched: 271\nTotal Matches: 1\nFunction ID: <File>::<ID>\nMatches:\n  File: src/drspec/core/scanner.py   (1 match)\n    ID: Scanner.__init__#f3edceab\n      Status: PENDING\n      Signature: def __init__(self, ignore_patterns: Optional[list[str]] = None) -> None:\n      Possibly Stale: No\nTruncated: No"
+   }
+  },
+  {
+   "result": 14,
+   "tool": "search",
+   "mode": "functions",
+   "arguments": {
+    "pattern": "legend|marker",
+    "regex": true,
+    "path_prefix": "tests/unit/test_compact_format.py"
+   },
+   "formats": {
+    "A": "Pattern: legend|marker\nSemantic: No\nFiles Searched: 1\nTotal Matches: 4\nFunction ID: <File>::<ID>\nMatches:\n  File: tests/unit/test_compact_format.py   (4 matches)\n    ID: TestRecords.test_a_signature_is_clipped_at_80_characters_with_a_marker_and_only_then#d9e613a7\n      Status: PENDING\n      Signature: def test_a_signature_is_clipped_at_80_characters_with_a_marker_and_only_then(self):\n      Possibly Stale: No\n    ID: TestTheLegend.test_it_names_the_marker_the_function_id_rule_and_the_defaults#d9e613a7\n      Status: PENDING\n      Signature: def test_it_names_the_marker_the_function_id_rule_and_the_defaults(self):\n      Possibly Stale: No\n    ID: TestTheLegend.test_every_marker_the_encoder_writes_is_explained#d9e613a7\n      Status: PENDING\n      Signature: def test_every_marker_the_encoder_writes_is_explained(self):\n      Possibly Stale: No\n    ID: TestNestedListsAreGrouped.test_a_list_of_records_that_are_not_functions_is_a_table_with_a_marker_for_a_missing_field#d9e613a7\n      Status: PENDING\n      Signature: def test_a_list_of_records_that_are_not_functions_is_a_table_with_a_marker_for_a_missing_field(self):\n      Possibly Stale: No\nTruncated: No",
+    "B": "~B\npattern: legend|marker\nsemantic: false\nfiles_searched: 1\ntotal_matches: 4\n# matches function_id function_name file_path status signature possibly_stale\n>tests/unit/\n test_compact_format.py\n  TestRecords.test_a_signature_is_clipped_at_80_characters_with_a_marker_and_only_then#d9e613a7\ts=def test_a_signature_is_clipped_at_80_characters_with_a_marker_and_only_then(se…\n  TestTheLegend.test_it_names_the_marker_the_function_id_rule_and_the_defaults#d9e613a7\ts=def test_it_names_the_marker_the_function_id_rule_and_the_defaults(self):\n  TestTheLegend.test_every_marker_the_encoder_writes_is_explained#d9e613a7\ts=def test_every_marker_the_encoder_writes_is_explained(self):\n  TestNestedListsAreGrouped.test_a_list_of_records_that_are_not_functions_is_a_table_with_a_marker_for_a_missing_field#d9e613a7\ts=def test_a_list_of_records_that_are_not_functions_is_a_table_with_a_marker_for_…\ntruncated: false",
+    "C": "~B\npattern: legend|marker\nsemantic: false\nfiles_searched: 1\ntotal_matches: 4\n# matches function_id function_name file_path status signature possibly_stale\n>tests/unit/\n test_compact_format.py\n  TestRecords.test_a_signature_is_clipped_at_80_characters_with_a_marker_and_only_then#d9e613a7\ts=def test_a_signature_is_clipped_at_80_characters_with_a_marker_and_only_then(se…\n  TestTheLegend.test_it_names_the_marker_the_function_id_rule_and_the_defaults#d9e613a7\ts=def test_it_names_the_marker_the_function_id_rule_and_the_defaults(self):\n  TestTheLegend.test_every_marker_the_encoder_writes_is_explained#d9e613a7\ts=def test_every_marker_the_encoder_writes_is_explained(self):\n  TestNestedListsAreGrouped.test_a_list_of_records_that_are_not_functions_is_a_table_with_a_marker_for_a_missing_field#d9e613a7\ts=def test_a_list_of_records_that_are_not_functions_is_a_table_with_a_marker_for_…\ntruncated: false",
+    "D": "Pattern: legend|marker\nSemantic: No\nFiles Searched: 1\nTotal Matches: 4\nFunction ID: <File>::<ID>\nMatches:\n  File: tests/unit/test_compact_format.py   (4 matches)\n    ID: TestRecords.test_a_signature_is_clipped_at_80_characters_with_a_marker_and_only_then#d9e613a7\n      Status: PENDING\n      Signature: def test_a_signature_is_clipped_at_80_characters_with_a_marker_and_only_then(self):\n      Possibly Stale: No\n    ID: TestTheLegend.test_it_names_the_marker_the_function_id_rule_and_the_defaults#d9e613a7\n      Status: PENDING\n      Signature: def test_it_names_the_marker_the_function_id_rule_and_the_defaults(self):\n      Possibly Stale: No\n    ID: TestTheLegend.test_every_marker_the_encoder_writes_is_explained#d9e613a7\n      Status: PENDING\n      Signature: def test_every_marker_the_encoder_writes_is_explained(self):\n      Possibly Stale: No\n    ID: TestNestedListsAreGrouped.test_a_list_of_records_that_are_not_functions_is_a_table_with_a_marker_for_a_missing_field#d9e613a7\n      Status: PENDING\n      Signature: def test_a_list_of_records_that_are_not_functions_is_a_table_with_a_marker_for_a_missing_field(self):\n      Possibly Stale: No\nTruncated: No"
+   }
+  },
+  {
+   "result": 24,
+   "tool": "search",
+   "mode": "lines",
+   "arguments": {
+    "pattern": "_TOOL_HANDLERS",
+    "path_prefix": "src/drspec/mcp_server.py",
+    "lines": true,
+    "context": 1
+   },
+   "formats": {
+    "A": "Pattern: _TOOL_HANDLERS\nSemantic: No\nFiles Searched: 1\nTotal Hits: 2\nTruncated: No\nBlocks:\n  src/drspec/mcp_server.py (lines 1913-1915)\n    1913- \n    1914: _TOOL_HANDLERS: dict[str, Callable[[Path, dict[str, Any]], tuple[Any, bool]]] = {\n    1915-     \"ack\": _tool_ack,\n  --\n  src/drspec/mcp_server.py (lines 2086-2088)  [in src/drspec/mcp_server.py::handle_message#5af375da]\n    2086-         arguments = params.get(\"arguments\") or {}\n    2087:         handler = _TOOL_HANDLERS.get(tool_name)\n    2088-         if handler is None:",
+    "B": "~B\npattern: _TOOL_HANDLERS\nsemantic: false\nfiles_searched: 1\ntotal_hits: 2\ntruncated: false\n% blocks\n>src/drspec/\n mcp_server.py\n@1913-1915\t1914\t\n-\n:_TOOL_HANDLERS: dict[str, Callable[[Path, dict[str, Any]], tuple[Any, bool]]] = {\n-    \"ack\": _tool_ack,\n@2086-2088\t2087\thandle_message#5af375da\n-        arguments = params.get(\"arguments\") or {}\n:        handler = _TOOL_HANDLERS.get(tool_name)\n-        if handler is None:",
+    "C": "~B\npattern: _TOOL_HANDLERS\nsemantic: false\nfiles_searched: 1\ntotal_hits: 2\ntruncated: false\n% blocks\n>src/drspec/\n mcp_server.py\n@1913-1915\t1914\t\n-\n:_TOOL_HANDLERS: dict[str, Callable[[Path, dict[str, Any]], tuple[Any, bool]]] = {\n-    \"ack\": _tool_ack,\n@2086-2088\t2087\thandle_message#5af375da\n-        arguments = params.get(\"arguments\") or {}\n:        handler = _TOOL_HANDLERS.get(tool_name)\n-        if handler is None:",
+    "D": "Pattern: _TOOL_HANDLERS\nSemantic: No\nFiles Searched: 1\nTotal Hits: 2\nTruncated: No\nBlocks:\n  src/drspec/mcp_server.py (lines 1913-1915)\n    1913- \n    1914: _TOOL_HANDLERS: dict[str, Callable[[Path, dict[str, Any]], tuple[Any, bool]]] = {\n    1915-     \"ack\": _tool_ack,\n  --\n  src/drspec/mcp_server.py (lines 2086-2088)  [in src/drspec/mcp_server.py::handle_message#5af375da]\n    2086-         arguments = params.get(\"arguments\") or {}\n    2087:         handler = _TOOL_HANDLERS.get(tool_name)\n    2088-         if handler is None:"
+   }
+  },
+  {
+   "result": 26,
+   "tool": "unused",
+   "mode": "-",
+   "arguments": {
+    "path_prefix": "src/drspec/staleness_worker.py"
+   },
+   "formats": {
+    "A": "Total Count: 2\nReturned: 2\nLimit: 100\nPath Filter: src/drspec/staleness_worker.py\nCaveat: Includes both functions with no caller/reference at all, and ones whose *only* caller/reference is itself a test (design.md §23 — see 'only_test_callers' per function) — a dead-code candidate list, not proof either way. CLI entry points and anything reflection/framework-invoked are not excluded automatically (only dunder/magic methods are); use path_prefix to exclude a known entry-point directory.\nFunction ID: <File>::<ID>\nFunctions:\n  File: src/drspec/staleness_worker.py   (2 functions)\n    ID: _remediate_queued_files.parse#60bf603c\n      Status: PENDING\n      Possibly Stale: No\n      Only Test Callers: No\n    ID: _raise_system_exit#c601740b\n      Status: PENDING\n      Possibly Stale: No\n      Only Test Callers: No",
+    "B": "~B\ntotal_count: 2\nreturned: 2\nlimit: 100\npath_filter: src/drspec/staleness_worker.py\ncaveat: ~2\n# functions function_id function_name file_path status possibly_stale only_test_callers\n>src/drspec/\n staleness_worker.py\n  _remediate_queued_files.parse#60bf603c\n  _raise_system_exit#c601740b",
+    "C": "~B\ntotal_count: 2\nreturned: 2\nlimit: 100\npath_filter: src/drspec/staleness_worker.py\ncaveat: ~2\n# functions function_id function_name file_path status possibly_stale only_test_callers\n>src/drspec/\n staleness_worker.py\n  _remediate_queued_files.parse#60bf603c\n  _raise_system_exit#c601740b",
+    "D": "Total Count: 2\nReturned: 2\nLimit: 100\nPath Filter: src/drspec/staleness_worker.py\nCaveat: Includes both functions with no caller/reference at all, and ones whose *only* caller/reference is itself a test (design.md §23 — see 'only_test_callers' per function) — a dead-code candidate list, not proof either way. CLI entry points and anything reflection/framework-invoked are not excluded automatically (only dunder/magic methods are); use path_prefix to exclude a known entry-point directory.\nFunction ID: <File>::<ID>\nFunctions:\n  File: src/drspec/staleness_worker.py   (2 functions)\n    ID: _remediate_queued_files.parse#60bf603c\n      Status: PENDING\n      Possibly Stale: No\n      Only Test Callers: No\n    ID: _raise_system_exit#c601740b\n      Status: PENDING\n      Possibly Stale: No\n      Only Test Callers: No"
+   }
+  },
+  {
+   "result": 27,
+   "tool": "search",
+   "mode": "lines",
+   "arguments": {
+    "pattern": "_TOOL_HANDLERS",
+    "path_prefix": "src/drspec/mcp_server.py",
+    "before_context": 2
+   },
+   "formats": {
+    "A": "Pattern: _TOOL_HANDLERS\nSemantic: No\nFiles Searched: 1\nTotal Hits: 2\nTruncated: No\nBlocks:\n  src/drspec/mcp_server.py (lines 1912-1914)\n    1912- \n    1913- \n    1914: _TOOL_HANDLERS: dict[str, Callable[[Path, dict[str, Any]], tuple[Any, bool]]] = {\n  --\n  src/drspec/mcp_server.py (lines 2085-2087)  [in src/drspec/mcp_server.py::handle_message#5af375da]\n    2085-         tool_name = params.get(\"name\")\n    2086-         arguments = params.get(\"arguments\") or {}\n    2087:         handler = _TOOL_HANDLERS.get(tool_name)",
+    "B": "~B\npattern: _TOOL_HANDLERS\nsemantic: false\nfiles_searched: 1\ntotal_hits: 2\ntruncated: false\n% blocks\n>src/drspec/\n mcp_server.py\n@1912-1914\t1914\t\n-\n-\n:_TOOL_HANDLERS: dict[str, Callable[[Path, dict[str, Any]], tuple[Any, bool]]] = {\n@2085-2087\t2087\thandle_message#5af375da\n-        tool_name = params.get(\"name\")\n-        arguments = params.get(\"arguments\") or {}\n:        handler = _TOOL_HANDLERS.get(tool_name)",
+    "C": "~B\npattern: _TOOL_HANDLERS\nsemantic: false\nfiles_searched: 1\ntotal_hits: 2\ntruncated: false\n% blocks\n>src/drspec/\n mcp_server.py\n@1912-1914\t1914\t\n-\n-\n:_TOOL_HANDLERS: dict[str, Callable[[Path, dict[str, Any]], tuple[Any, bool]]] = {\n@2085-2087\t2087\thandle_message#5af375da\n-        tool_name = params.get(\"name\")\n-        arguments = params.get(\"arguments\") or {}\n:        handler = _TOOL_HANDLERS.get(tool_name)",
+    "D": "Pattern: _TOOL_HANDLERS\nSemantic: No\nFiles Searched: 1\nTotal Hits: 2\nTruncated: No\nBlocks:\n  src/drspec/mcp_server.py (lines 1912-1914)\n    1912- \n    1913- \n    1914: _TOOL_HANDLERS: dict[str, Callable[[Path, dict[str, Any]], tuple[Any, bool]]] = {\n  --\n  src/drspec/mcp_server.py (lines 2085-2087)  [in src/drspec/mcp_server.py::handle_message#5af375da]\n    2085-         tool_name = params.get(\"name\")\n    2086-         arguments = params.get(\"arguments\") or {}\n    2087:         handler = _TOOL_HANDLERS.get(tool_name)"
+   }
+  },
+  {
+   "result": 42,
+   "tool": "search",
+   "mode": "lines",
+   "arguments": {
+    "pattern": "mcp_server",
+    "path_prefix": "src/drspec/cli/commands/mcp_serve.py",
+    "lines": true
+   },
+   "formats": {
+    "A": "Pattern: mcp_server\nSemantic: No\nFiles Searched: 1\nTotal Hits: 3\nTruncated: No\nHits:\n  src/drspec/cli/commands/mcp_serve.py:3:reaches for Bash/Read/Grep. See `drspec.mcp_server` for the protocol\n  src/drspec/cli/commands/mcp_serve.py:17:from drspec import mcp_server\n  src/drspec/cli/commands/mcp_serve.py:29:    mcp_server.run(db_path)  [in src/drspec/cli/commands/mcp_serve.py::mcp_serve_command#0879edbd]",
+    "B": "~B\npattern: mcp_server\nsemantic: false\nfiles_searched: 1\ntotal_hits: 3\ntruncated: false\n^ hits\n>src/drspec/cli/commands/\n mcp_serve.py\n3\t\treaches for Bash/Read/Grep. See `drspec.mcp_server` for the protocol\n17\t\tfrom drspec import mcp_server\n29\tmcp_serve_command#0879edbd\t    mcp_server.run(db_path)",
+    "C": "~B\npattern: mcp_server\nsemantic: false\nfiles_searched: 1\ntotal_hits: 3\ntruncated: false\n^ hits\n>src/drspec/cli/commands/\n mcp_serve.py\n3\t\treaches for Bash/Read/Grep. See `drspec.mcp_server` for the protocol\n17\t\tfrom drspec import mcp_server\n29\tmcp_serve_command#0879edbd\t    mcp_server.run(db_path)",
+    "D": "Pattern: mcp_server\nSemantic: No\nFiles Searched: 1\nTotal Hits: 3\nTruncated: No\nHits:\n  src/drspec/cli/commands/mcp_serve.py:3:reaches for Bash/Read/Grep. See `drspec.mcp_server` for the protocol\n  src/drspec/cli/commands/mcp_serve.py:17:from drspec import mcp_server\n  src/drspec/cli/commands/mcp_serve.py:29:    mcp_server.run(db_path)  [in src/drspec/cli/commands/mcp_serve.py::mcp_serve_command#0879edbd]"
+   }
+  },
+  {
+   "result": 43,
+   "tool": "search",
+   "mode": "lines",
+   "arguments": {
+    "pattern": "mcp_server",
+    "path_prefix": "src/drspec/cli/commands/mcp_serve.py",
+    "lines": "true"
+   },
+   "formats": {
+    "A": "Pattern: mcp_server\nSemantic: No\nFiles Searched: 1\nTotal Hits: 3\nTruncated: No\nHits:\n  src/drspec/cli/commands/mcp_serve.py:3:reaches for Bash/Read/Grep. See `drspec.mcp_server` for the protocol\n  src/drspec/cli/commands/mcp_serve.py:17:from drspec import mcp_server\n  src/drspec/cli/commands/mcp_serve.py:29:    mcp_server.run(db_path)  [in src/drspec/cli/commands/mcp_serve.py::mcp_serve_command#0879edbd]",
+    "B": "~B\npattern: mcp_server\nsemantic: false\nfiles_searched: 1\ntotal_hits: 3\ntruncated: false\n^ hits\n>src/drspec/cli/commands/\n mcp_serve.py\n3\t\treaches for Bash/Read/Grep. See `drspec.mcp_server` for the protocol\n17\t\tfrom drspec import mcp_server\n29\tmcp_serve_command#0879edbd\t    mcp_server.run(db_path)",
+    "C": "~B\npattern: mcp_server\nsemantic: false\nfiles_searched: 1\ntotal_hits: 3\ntruncated: false\n^ hits\n>src/drspec/cli/commands/\n mcp_serve.py\n3\t\treaches for Bash/Read/Grep. See `drspec.mcp_server` for the protocol\n17\t\tfrom drspec import mcp_server\n29\tmcp_serve_command#0879edbd\t    mcp_server.run(db_path)",
+    "D": "Pattern: mcp_server\nSemantic: No\nFiles Searched: 1\nTotal Hits: 3\nTruncated: No\nHits:\n  src/drspec/cli/commands/mcp_serve.py:3:reaches for Bash/Read/Grep. See `drspec.mcp_server` for the protocol\n  src/drspec/cli/commands/mcp_serve.py:17:from drspec import mcp_server\n  src/drspec/cli/commands/mcp_serve.py:29:    mcp_server.run(db_path)  [in src/drspec/cli/commands/mcp_serve.py::mcp_serve_command#0879edbd]"
+   }
+  },
+  {
+   "result": 56,
+   "tool": "search",
+   "mode": "lines",
+   "arguments": {
+    "pattern": "get_connection_context|get_reference_edge|get_all_config|queue_retry|queue_clear_completed|count_vision_findings|query_contracts|search_contracts|insert_dependency|get_reasoning_traces|queue_complete",
+    "regex": true,
+    "lines": true,
+    "path_prefix": "src"
+   },
+   "formats": {
+    "A": "Pattern: get_connection_context|get_reference_edge|get_all_config|queue_retry|queue_clear_completed|count_vision_findings|query_contracts|search_contracts|insert_dependency|get_reasoning_traces|queue_complete\nSemantic: No\nFiles Searched: 130\nTotal Hits: 3\nTruncated: No\nHits:\n  src/drspec/db/__init__.py:66:    get_reasoning_traces,\n  src/drspec/db/__init__.py:164:    \"get_reasoning_traces\",\n  src/drspec/db/queries.py:1735:def get_reasoning_traces(  [in src/drspec/db/queries.py::get_reasoning_traces#9aebd608]\nIndex:\n  Pending: 4\n  Total: 290\nNote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now.",
+    "B": "~B\npattern: get_connection_context|get_reference_edge|get_all_config|queue_retry|queue_clear_completed|count_vision_findings|query_contracts|search_contracts|insert_dependency|get_reasoning_traces|queue_complete\nsemantic: false\nfiles_searched: 130\ntotal_hits: 3\ntruncated: false\n^ hits\n>src/drspec/db/\n __init__.py\n66\t\t    get_reasoning_traces,\n164\t\t    \"get_reasoning_traces\",\n queries.py\n1735\tget_reasoning_traces#9aebd608\tdef get_reasoning_traces(\nindex: {\"pending\":4,\"total\":290}\nnote: ~I",
+    "C": "~B\npattern: get_connection_context|get_reference_edge|get_all_config|queue_retry|queue_clear_completed|count_vision_findings|query_contracts|search_contracts|insert_dependency|get_reasoning_traces|queue_complete\nsemantic: false\nfiles_searched: 130\ntotal_hits: 3\ntruncated: false\n^ hits\n>src/drspec/db/\n __init__.py\n66\t\t    get_reasoning_traces,\n164\t\t    \"get_reasoning_traces\",\n queries.py\n1735\tget_reasoning_traces#9aebd608\tdef get_reasoning_traces(\nindex: {\"pending\":4,\"total\":290}\nnote: ~I",
+    "D": "~D @a=Possibly @b=Confidence: @c=Signature: @d=src/drspec/ @e=EXTRACTED @f=--calls-- @g=Contract: @h=duckdb.DuckDBPyConnection @i=Callers: @j=tests/unit/ @k=typer.Option @l=functions @m=cli/commands/ @n=function @o=Optional @p=caller/reference @q=monkeypatch @r=reflection/framework-invoked @s=Function @t=Truncated: @u=staleness_worker.py @v=TestTheDrain.test_a_queue_is_drained_back_to_back_and_detection_keeps_its_own_cadence#364b44d9 @w=Semantic: @x=Searched: @y=TestListUnusedArtifacts.test_a_ @z=TestNormalizeCode.test_python_docstrings_go_too_but_a_hash_in_a_string_stays#d9e613a7 @A=db_path: @B=typer.Context @C=Pattern: @D=Matches:\n@C get_connection_context|get_reference_edge|get_all_config|queue_retry|queue_clear_completed|count_vision_findings|query_contracts|search_contracts|insert_dependency|get_reasoning_traces|queue_complete\n@w No\nFiles @x 130\nTotal Hits: 3\n@t No\nHits:\n  @ddb/__init__.py:66:    get_reasoning_traces,\n  @ddb/__init__.py:164:    \"get_reasoning_traces\",\n  @ddb/queries.py:1735:def get_reasoning_traces(  [in @ddb/queries.py::get_reasoning_traces#9aebd608]\nIndex:\n  Pending: 4\n  Total: 290\nNote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now."
+   }
+  },
+  {
+   "result": 58,
+   "tool": "search",
+   "mode": "lines",
+   "arguments": {
+    "pattern": "MAX_|LIMIT|truncat|decode|errors=",
+    "regex": true,
+    "lines": true,
+    "path_prefix": "src/drspec/core/live_search.py"
+   },
+   "formats": {
+    "A": "Pattern: MAX_|LIMIT|truncat|decode|errors=\nSemantic: No\nFiles Searched: 1\nTotal Hits: 11\nTruncated: No\nHits:\n  src/drspec/core/live_search.py:36:MAX_LISTED_UNSCANNED = 10\n  src/drspec/core/live_search.py:40:MAX_LINE_CHARS = 300\n  src/drspec/core/live_search.py:61:    lines = path.read_bytes().decode(\"utf-8\").split(\"\\n\")  [in src/drspec/core/live_search.py::_read_lines#69873ad1]\n  src/drspec/core/live_search.py:69:    `MAX_LINE_CHARS`, a window of that width around the first match plus  [in src/drspec/core/live_search.py::_clip#094207c6]\n  src/drspec/core/live_search.py:71:    if len(line) <= MAX_LINE_CHARS:  [in src/drspec/core/live_search.py::_clip#094207c6]\n  src/drspec/core/live_search.py:74:    start = max(0, match.start() - MAX_LINE_CHARS // 3) if match else 0  [in src/drspec/core/live_search.py::_clip#094207c6]\n  src/drspec/core/live_search.py:75:    end = min(len(line), start + MAX_LINE_CHARS)  [in src/drspec/core/live_search.py::_clip#094207c6]\n  src/drspec/core/live_search.py:76:    start = max(0, end - MAX_LINE_CHARS)  [in src/drspec/core/live_search.py::_clip#094207c6]\n  src/drspec/core/live_search.py:237:    truncated = total_found > limit  [in src/drspec/core/live_search.py::live_search#bd2da4c6]\n  src/drspec/core/live_search.py:258:        \"truncated\": truncated,  [in src/drspec/core/live_search.py::live_search#bd2da4c6]\n  src/drspec/core/live_search.py:304:            \"examples\": unscanned[:MAX_LISTED_UNSCANNED],  [in src/drspec/core/live_search.py::live_search#bd2da4c6]\nIndex:\n  Pending: 4\n  Total: 290\nNote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now.",
+    "B": "~B\npattern: MAX_|LIMIT|truncat|decode|errors=\nsemantic: false\nfiles_searched: 1\ntotal_hits: 11\ntruncated: false\n^ hits\n>src/drspec/core/\n live_search.py\n36\t\tMAX_LISTED_UNSCANNED = 10\n40\t\tMAX_LINE_CHARS = 300\n61\t_read_lines#69873ad1\t    lines = path.read_bytes().decode(\"utf-8\").split(\"\\n\")\n69\t_clip#094207c6\t    `MAX_LINE_CHARS`, a window of that width around the first match plus\n71\t=\t    if len(line) <= MAX_LINE_CHARS:\n74\t=\t    start = max(0, match.start() - MAX_LINE_CHARS // 3) if match else 0\n75\t=\t    end = min(len(line), start + MAX_LINE_CHARS)\n76\t=\t    start = max(0, end - MAX_LINE_CHARS)\n237\tlive_search#bd2da4c6\t    truncated = total_found > limit\n258\t=\t        \"truncated\": truncated,\n304\t=\t            \"examples\": unscanned[:MAX_LISTED_UNSCANNED],\nindex: {\"pending\":4,\"total\":290}\nnote: ~I",
+    "C": "~B\npattern: MAX_|LIMIT|truncat|decode|errors=\nsemantic: false\nfiles_searched: 1\ntotal_hits: 11\ntruncated: false\n^ hits\n>src/drspec/core/\n live_search.py\n36\t\tMAX_LISTED_UNSCANNED = 10\n40\t\tMAX_LINE_CHARS = 300\n61\t_read_lines#69873ad1\t    lines = path.read_bytes().decode(\"utf-8\").split(\"\\n\")\n69\t_clip#094207c6\t    `MAX_LINE_CHARS`, a window of that width around the first match plus\n71\t=\t    if len(line) <= MAX_LINE_CHARS:\n74\t=\t    start = max(0, match.start() - MAX_LINE_CHARS // 3) if match else 0\n75\t=\t    end = min(len(line), start + MAX_LINE_CHARS)\n76\t=\t    start = max(0, end - MAX_LINE_CHARS)\n237\tlive_search#bd2da4c6\t    truncated = total_found > limit\n258\t=\t        \"truncated\": truncated,\n304\t=\t            \"examples\": unscanned[:MAX_LISTED_UNSCANNED],\nindex: {\"pending\":4,\"total\":290}\nnote: ~I",
+    "D": "~D @a=Possibly @b=Confidence: @c=Signature: @d=src/drspec/ @e=EXTRACTED @f=--calls-- @g=Contract: @h=duckdb.DuckDBPyConnection @i=Callers: @j=tests/unit/ @k=typer.Option @l=functions @m=cli/commands/ @n=function @o=Optional @p=caller/reference @q=monkeypatch @r=reflection/framework-invoked @s=Function @t=Truncated: @u=staleness_worker.py @v=TestTheDrain.test_a_queue_is_drained_back_to_back_and_detection_keeps_its_own_cadence#364b44d9 @w=Semantic: @x=Searched: @y=TestListUnusedArtifacts.test_a_ @z=TestNormalizeCode.test_python_docstrings_go_too_but_a_hash_in_a_string_stays#d9e613a7 @A=db_path: @B=typer.Context @C=Pattern: @D=Matches:\n@C MAX_|LIMIT|truncat|decode|errors=\n@w No\nFiles @x 1\nTotal Hits: 11\n@t No\nHits:\n  @dcore/live_search.py:36:MAX_LISTED_UNSCANNED = 10\n  @dcore/live_search.py:40:MAX_LINE_CHARS = 300\n  @dcore/live_search.py:61:    lines = path.read_bytes().decode(\"utf-8\").split(\"\\n\")  [in @dcore/live_search.py::_read_lines#69873ad1]\n  @dcore/live_search.py:69:    `MAX_LINE_CHARS`, a window of that width around the first match plus  [in @dcore/live_search.py::_clip#094207c6]\n  @dcore/live_search.py:71:    if len(line) <= MAX_LINE_CHARS:  [in @dcore/live_search.py::_clip#094207c6]\n  @dcore/live_search.py:74:    start = max(0, match.start() - MAX_LINE_CHARS // 3) if match else 0  [in @dcore/live_search.py::_clip#094207c6]\n  @dcore/live_search.py:75:    end = min(len(line), start + MAX_LINE_CHARS)  [in @dcore/live_search.py::_clip#094207c6]\n  @dcore/live_search.py:76:    start = max(0, end - MAX_LINE_CHARS)  [in @dcore/live_search.py::_clip#094207c6]\n  @dcore/live_search.py:237:    truncated = total_found > limit  [in @dcore/live_search.py::live_search#bd2da4c6]\n  @dcore/live_search.py:258:        \"truncated\": truncated,  [in @dcore/live_search.py::live_search#bd2da4c6]\n  @dcore/live_search.py:304:            \"examples\": unscanned[:MAX_LISTED_UNSCANNED],  [in @dcore/live_search.py::live_search#bd2da4c6]\nIndex:\n  Pending: 4\n  Total: 290\nNote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now."
+   }
+  },
+  {
+   "result": 63,
+   "tool": "search",
+   "mode": "lines",
+   "arguments": {
+    "pattern": "stale|_enclosing_function|stat\\(|mtime",
+    "regex": true,
+    "lines": true,
+    "path_prefix": "src/drspec/core/live_search.py"
+   },
+   "formats": {
+    "A": "Pattern: stale|_enclosing_function|stat\\(|mtime\nSemantic: No\nFiles Searched: 1\nTotal Hits: 9\nTruncated: No\nHits:\n  src/drspec/core/live_search.py:27:from drspec.core.staleness import drifted_file_paths, queue_files_for_rescan\n  src/drspec/core/live_search.py:33:    stale_file_paths_among,\n  src/drspec/core/live_search.py:81:def _enclosing_function(ranges: list[tuple[str, int, int]], line: int) -> Optional[str]:  [in src/drspec/core/live_search.py::_enclosing_function#9a625466]\n  src/drspec/core/live_search.py:247:    stale = (stale_file_paths_among(conn, paths) | drifted_file_paths(conn, paths, root)) if paths else set()  [in src/drspec/core/live_search.py::live_search#bd2da4c6]\n  src/drspec/core/live_search.py:248:    ranges = list_function_ranges(conn, [p for p in paths if p not in stale])  [in src/drspec/core/live_search.py::live_search#bd2da4c6]\n  src/drspec/core/live_search.py:251:        return _enclosing_function(ranges.get(file_path, []), line)  [in src/drspec/core/live_search.py::live_search.label#60bf603c]\n  src/drspec/core/live_search.py:293:        [(path, \"search_drift\") for path in sorted(stale)] + [(path, \"search_unscanned\") for path in unscanned],  [in src/drspec/core/live_search.py::live_search#bd2da4c6]\n  src/drspec/core/live_search.py:307:    if stale:  [in src/drspec/core/live_search.py::live_search#bd2da4c6]\n  src/drspec/core/live_search.py:308:        data[\"possibly_stale_files\"] = sorted(stale)  [in src/drspec/core/live_search.py::live_search#bd2da4c6]\nIndex:\n  Pending: 4\n  Total: 290\nNote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now.",
+    "B": "~B\npattern: stale|_enclosing_function|stat\\(|mtime\nsemantic: false\nfiles_searched: 1\ntotal_hits: 9\ntruncated: false\n^ hits\n>src/drspec/core/\n live_search.py\n27\t\tfrom drspec.core.staleness import drifted_file_paths, queue_files_for_rescan\n33\t\t    stale_file_paths_among,\n81\t_enclosing_function#9a625466\tdef _enclosing_function(ranges: list[tuple[str, int, int]], line: int) -> Optional[str]:\n247\tlive_search#bd2da4c6\t    stale = (stale_file_paths_among(conn, paths) | drifted_file_paths(conn, paths, root)) if paths else set()\n248\t=\t    ranges = list_function_ranges(conn, [p for p in paths if p not in stale])\n251\tlive_search.label#60bf603c\t        return _enclosing_function(ranges.get(file_path, []), line)\n293\tlive_search#bd2da4c6\t        [(path, \"search_drift\") for path in sorted(stale)] + [(path, \"search_unscanned\") for path in unscanned],\n307\t=\t    if stale:\n308\t=\t        data[\"possibly_stale_files\"] = sorted(stale)\nindex: {\"pending\":4,\"total\":290}\nnote: ~I",
+    "C": "~B\npattern: stale|_enclosing_function|stat\\(|mtime\nsemantic: false\nfiles_searched: 1\ntotal_hits: 9\ntruncated: false\n^ hits\n>src/drspec/core/\n live_search.py\n27\t\tfrom drspec.core.staleness import drifted_file_paths, queue_files_for_rescan\n33\t\t    stale_file_paths_among,\n81\t_enclosing_function#9a625466\tdef _enclosing_function(ranges: list[tuple[str, int, int]], line: int) -> Optional[str]:\n247\tlive_search#bd2da4c6\t    stale = (stale_file_paths_among(conn, paths) | drifted_file_paths(conn, paths, root)) if paths else set()\n248\t=\t    ranges = list_function_ranges(conn, [p for p in paths if p not in stale])\n251\tlive_search.label#60bf603c\t        return _enclosing_function(ranges.get(file_path, []), line)\n293\tlive_search#bd2da4c6\t        [(path, \"search_drift\") for path in sorted(stale)] + [(path, \"search_unscanned\") for path in unscanned],\n307\t=\t    if stale:\n308\t=\t        data[\"possibly_stale_files\"] = sorted(stale)\nindex: {\"pending\":4,\"total\":290}\nnote: ~I",
+    "D": "~D @a=Possibly @b=Confidence: @c=Signature: @d=src/drspec/ @e=EXTRACTED @f=--calls-- @g=Contract: @h=duckdb.DuckDBPyConnection @i=Callers: @j=tests/unit/ @k=typer.Option @l=functions @m=cli/commands/ @n=function @o=Optional @p=caller/reference @q=monkeypatch @r=reflection/framework-invoked @s=Function @t=Truncated: @u=staleness_worker.py @v=TestTheDrain.test_a_queue_is_drained_back_to_back_and_detection_keeps_its_own_cadence#364b44d9 @w=Semantic: @x=Searched: @y=TestListUnusedArtifacts.test_a_ @z=TestNormalizeCode.test_python_docstrings_go_too_but_a_hash_in_a_string_stays#d9e613a7 @A=db_path: @B=typer.Context @C=Pattern: @D=Matches:\n@C stale|_enclosing_@n|stat\\(|mtime\n@w No\nFiles @x 1\nTotal Hits: 9\n@t No\nHits:\n  @dcore/live_search.py:27:from drspec.core.staleness import drifted_file_paths, queue_files_for_rescan\n  @dcore/live_search.py:33:    stale_file_paths_among,\n  @dcore/live_search.py:81:def _enclosing_@n(ranges: list[tuple[str, int, int]], line: int) -> @o[str]:  [in @dcore/live_search.py::_enclosing_@n#9a625466]\n  @dcore/live_search.py:247:    stale = (stale_file_paths_among(conn, paths) | drifted_file_paths(conn, paths, root)) if paths else set()  [in @dcore/live_search.py::live_search#bd2da4c6]\n  @dcore/live_search.py:248:    ranges = list_@n_ranges(conn, [p for p in paths if p not in stale])  [in @dcore/live_search.py::live_search#bd2da4c6]\n  @dcore/live_search.py:251:        return _enclosing_@n(ranges.get(file_path, []), line)  [in @dcore/live_search.py::live_search.label#60bf603c]\n  @dcore/live_search.py:293:        [(path, \"search_drift\") for path in sorted(stale)] + [(path, \"search_unscanned\") for path in unscanned],  [in @dcore/live_search.py::live_search#bd2da4c6]\n  @dcore/live_search.py:307:    if stale:  [in @dcore/live_search.py::live_search#bd2da4c6]\n  @dcore/live_search.py:308:        data[\"possibly_stale_files\"] = sorted(stale)  [in @dcore/live_search.py::live_search#bd2da4c6]\nIndex:\n  Pending: 4\n  Total: 290\nNote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now."
+   }
+  },
+  {
+   "result": 112,
+   "tool": "search",
+   "mode": "functions",
+   "arguments": {
+    "pattern": "",
+    "status": "PENDING",
+    "limit": 2
+   },
+   "formats": {
+    "A": "Pattern: \nSemantic: No\nFiles Searched: 271\nIndex:\n  Pending: 4\n  Total: 290\nNote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now. Showing 2 of 5340 matching functions, best match first; raise limit to see more.\nTotal Matches: 5340\nFunction ID: <File>::<ID>\nMatches:\n  File: scripts/bench_output_format.py   (2 matches)\n    ID: extract_queries#fd54a76a\n      Status: PENDING\n      Signature: def extract_queries(pattern: str = TRANSCRIPTS) -> list:\n      Possibly Stale: No\n    ID: build_index#69873ad1\n      Status: PENDING\n      Signature: def build_index(root: Path = ROOT):\n      Possibly Stale: No\nTruncated: Yes",
+    "B": "~B\npattern: \nsemantic: false\nfiles_searched: 271\nindex: {\"pending\":4,\"total\":290}\nnote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now. Showing 2 of 5340 matching functions, best match first; raise limit to see more.\ntotal_matches: 5340\n# matches function_id function_name file_path status signature possibly_stale\n>scripts/\n bench_output_format.py\n  extract_queries#fd54a76a\ts=def extract_queries(pattern: str = TRANSCRIPTS) -> list:\n  build_index#69873ad1\ts=def build_index(root: Path = ROOT):\ntruncated: true",
+    "C": "~B\npattern: \nsemantic: false\nfiles_searched: 271\nindex: {\"pending\":4,\"total\":290}\nnote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now. Showing 2 of 5340 matching functions, best match first; raise limit to see more.\ntotal_matches: 5340\n# matches function_id function_name file_path status signature possibly_stale\n>scripts/\n bench_output_format.py\n  extract_queries#fd54a76a\ts=def extract_queries(pattern: str = TRANSCRIPTS) -> list:\n  build_index#69873ad1\ts=def build_index(root: Path = ROOT):\ntruncated: true",
+    "D": "~D @a=src/drspec/ @b=Possibly @c=Signature: @d=Confidence: @e=EXTRACTED @f=--calls-- @g=Contract: @h=tests/unit/ @i=cli/commands/ @j=duckdb.DuckDBPyConnection @k=Callers: @l=visualization/ @m=Truncated: @n=functions @o=typer.Option @p=Semantic: @q=Searched: @r=conn.execute @s=caller/reference @t=Pattern: @u=function @v=reflection/framework-invoked @w=Optional @x=incomplete: @y=init.py::init_command#7c2c48c9 @z=worker_ipc.py::WorkerIPCServer.__init__#d2824146 @A=core/live_search.py::live_search#bd2da4c6 @B=core/js_modules.py::resolve_module#01804023 @C=Function @D=scan.py::scan_command#dd894993\n@t \n@p No\nFiles @q 271\nIndex:\n  Pending: 4\n  Total: 290\nNote: Index @x 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now. Showing 2 of 5340 matching @n, best match first; raise limit to see more.\nTotal Matches: 5340\n@C ID: <File>::<ID>\nMatches:\n  File: scripts/bench_output_format.py   (2 matches)\n    ID: extract_queries#fd54a76a\n      Status: PENDING\n      @c def extract_queries(pattern: str = TRANSCRIPTS) -> list:\n      @b Stale: No\n    ID: build_index#69873ad1\n      Status: PENDING\n      @c def build_index(root: Path = ROOT):\n      @b Stale: No\n@m Yes"
+   }
+  },
+  {
+   "result": 147,
+   "tool": "search",
+   "mode": "functions",
+   "arguments": {
+    "pattern": "upsert",
+    "limit": 5
+   },
+   "formats": {
+    "A": "Pattern: upsert\nSemantic: No\nFiles Searched: 271\nIndex:\n  Pending: 4\n  Total: 290\nNote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now. Showing 5 of 33 matching functions, best match first; raise limit to see more.\nTotal Matches: 33\nFunction ID: <File>::<ID>\nMatches:\n  File: src/drspec/db/queries.py   (4 matches)\n    ID: upsert_edges#31673776\n      Status: PENDING\n      Signature: def upsert_edges(conn: duckdb.DuckDBPyConnection, table: str, site_column: str, rows: Sequence[Sequence[Any]]) -> None:\n      Possibly Stale: No\n    ID: upsert_dependency_edge#f7f7b78e\n      Status: PENDING\n      Signature: def upsert_dependency_edge( conn: duckdb.DuckDBPyConnection, caller_id: str, callee_id: str, call_site: str, edge_hash: str, embedding: Optional[list[float]], confidence: str, ) -> None:\n      Possibly Stale: No\n    ID: upsert_reference_edge#f7f7b78e\n      Status: PENDING\n      Signature: def upsert_reference_edge( conn: duckdb.DuckDBPyConnection, caller_id: str, callee_id: str, reference_site: str, edge_hash: str, embedding: Optional[list[float]], confidence: str, ) -> None:\n      Possibly Stale: No\n    ID: upsert_scanned_file#79f1ed1e\n      Status: PENDING\n      Signature: def upsert_scanned_file(conn: duckdb.DuckDBPyConnection, file_path: str, mtime: float, size: int) -> None:\n      Possibly Stale: No\n\n  File: tests/unit/test_db_queries.py   (1 match)\n    ID: TestScannedFilesAndStalenessQueue.test_upsert_then_list_scanned_file#87bebcdd\n      Status: PENDING\n      Signature: def test_upsert_then_list_scanned_file(self, db_conn):\n      Possibly Stale: No\nTruncated: Yes",
+    "B": "~B\npattern: upsert\nsemantic: false\nfiles_searched: 271\nindex: {\"pending\":4,\"total\":290}\nnote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now. Showing 5 of 33 matching functions, best match first; raise limit to see more.\ntotal_matches: 33\n# matches function_id function_name file_path status signature possibly_stale\n>src/drspec/db/\n queries.py\n  upsert_edges#31673776\ts=def upsert_edges(conn: duckdb.DuckDBPyConnection, table: str, site_column: str,…\n  upsert_dependency_edge#f7f7b78e\ts=def upsert_dependency_edge( conn: duckdb.DuckDBPyConnection, caller_id: str, ca…\n  upsert_reference_edge#f7f7b78e\ts=def upsert_reference_edge( conn: duckdb.DuckDBPyConnection, caller_id: str, cal…\n  upsert_scanned_file#79f1ed1e\ts=def upsert_scanned_file(conn: duckdb.DuckDBPyConnection, file_path: str, mtime:…\n>tests/unit/\n test_db_queries.py\n  TestScannedFilesAndStalenessQueue.test_upsert_then_list_scanned_file#87bebcdd\ts=def test_upsert_then_list_scanned_file(self, db_conn):\ntruncated: true",
+    "C": "~B\npattern: upsert\nsemantic: false\nfiles_searched: 271\nindex: {\"pending\":4,\"total\":290}\nnote: Index incomplete: 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now. Showing 5 of 33 matching functions, best match first; raise limit to see more.\ntotal_matches: 33\n# matches function_id function_name file_path status signature possibly_stale\n>src/drspec/db/\n queries.py\n  upsert_edges#31673776\ts=def upsert_edges(conn: duckdb.DuckDBPyConnection, table: str, site_column: str,…\n  upsert_dependency_edge#f7f7b78e\ts=def upsert_dependency_edge( conn: duckdb.DuckDBPyConnection, caller_id: str, ca…\n  upsert_reference_edge#f7f7b78e\ts=def upsert_reference_edge( conn: duckdb.DuckDBPyConnection, caller_id: str, cal…\n  upsert_scanned_file#79f1ed1e\ts=def upsert_scanned_file(conn: duckdb.DuckDBPyConnection, file_path: str, mtime:…\n>tests/unit/\n test_db_queries.py\n  TestScannedFilesAndStalenessQueue.test_upsert_then_list_scanned_file#87bebcdd\ts=def test_upsert_then_list_scanned_file(self, db_conn):\ntruncated: true",
+    "D": "~D @a=src/drspec/ @b=Possibly @c=Signature: @d=Confidence: @e=EXTRACTED @f=--calls-- @g=Contract: @h=tests/unit/ @i=cli/commands/ @j=duckdb.DuckDBPyConnection @k=Callers: @l=visualization/ @m=Truncated: @n=functions @o=typer.Option @p=Semantic: @q=Searched: @r=conn.execute @s=caller/reference @t=Pattern: @u=function @v=reflection/framework-invoked @w=Optional @x=incomplete: @y=init.py::init_command#7c2c48c9 @z=worker_ipc.py::WorkerIPCServer.__init__#d2824146 @A=core/live_search.py::live_search#bd2da4c6 @B=core/js_modules.py::resolve_module#01804023 @C=Function @D=scan.py::scan_command#dd894993\n@t upsert\n@p No\nFiles @q 271\nIndex:\n  Pending: 4\n  Total: 290\nNote: Index @x 4 of 290 files are not scanned yet; results may be missing. Run 'drspec scan <path>' to scan now. Showing 5 of 33 matching @n, best match first; raise limit to see more.\nTotal Matches: 33\n@C ID: <File>::<ID>\nMatches:\n  File: @adb/queries.py   (4 matches)\n    ID: upsert_edges#31673776\n      Status: PENDING\n      @c def upsert_edges(conn: @j, table: str, site_column: str, rows: Sequence[Sequence[Any]]) -> None:\n      @b Stale: No\n    ID: upsert_dependency_edge#f7f7b78e\n      Status: PENDING\n      @c def upsert_dependency_edge( conn: @j, caller_id: str, callee_id: str, call_site: str, edge_hash: str, embedding: @w[list[float]], confidence: str, ) -> None:\n      @b Stale: No\n    ID: upsert_reference_edge#f7f7b78e\n      Status: PENDING\n      @c def upsert_reference_edge( conn: @j, caller_id: str, callee_id: str, reference_site: str, edge_hash: str, embedding: @w[list[float]], confidence: str, ) -> None:\n      @b Stale: No\n    ID: upsert_scanned_file#79f1ed1e\n      Status: PENDING\n      @c def upsert_scanned_file(conn: @j, file_path: str, mtime: float, size: int) -> None:\n      @b Stale: No\n\n  File: @htest_db_queries.py   (1 match)\n    ID: TestScannedFilesAndStalenessQueue.test_upsert_then_list_scanned_file#87bebcdd\n      Status: PENDING\n      @c def test_upsert_then_list_scanned_file(self, db_conn):\n      @b Stale: No\n@m Yes"
+   }
+  }
+ ],
+ "questions": [
+  {
+   "n": 1,
+   "result": 0,
+   "question": "How many of the matched functions are in files under tests/?",
+   "answer": 3
+  },
+  {
+   "n": 2,
+   "result": 147,
+   "question": "Which file holds the most matched functions? Give its path.",
+   "answer": "src/drspec/db/queries.py"
+  },
+  {
+   "n": 3,
+   "result": 13,
+   "question": "What is the signature of the function named __init__? Give it exactly as listed.",
+   "answer": "def __init__(self, ignore_patterns: Optional[list[str]] = None) -> None:"
+  },
+  {
+   "n": 4,
+   "result": 14,
+   "question": "What is the signature of the function named test_it_names_the_marker_the_function_id_rule_and_the_defaults? Give it exactly as listed.",
+   "answer": "def test_it_names_the_marker_the_function_id_rule_and_the_defaults(self):"
+  },
+  {
+   "n": 5,
+   "result": 11,
+   "question": "Is the function count_unused_artifacts (in src/drspec/db/queries.py) possibly stale? Answer yes or no.",
+   "answer": "no"
+  },
+  {
+   "n": 6,
+   "result": 112,
+   "question": "Which other matched functions are in the same file as extract_queries (scripts/bench_output_format.py)? List their names, sorted.",
+   "answer": [
+    "build_index"
+   ]
+  },
+  {
+   "n": 7,
+   "result": 2,
+   "question": "Which functions call compute_edge_hash directly (depth 1)? List their names, sorted.",
+   "answer": [
+    "_refresh_callee_edges",
+    "_refresh_callee_references",
+    "_sync_caller_edges",
+    "_sync_caller_references"
+   ]
+  },
+  {
+   "n": 8,
+   "result": 3,
+   "question": "Which functions call normalize_code directly (depth 1)? List their names, sorted.",
+   "answer": [
+    "test_a_comment_marker_inside_a_string_is_text",
+    "test_comments_do_not_change_the_normalised_text",
+    "test_legacy_hash_is_invalidated_once",
+    "test_lifetimes_are_not_character_literals",
+    "test_normalize_javascript",
+    "test_normalize_python",
+    "test_normalize_unknown_language",
+    "test_python_docstrings_go_too_but_a_hash_in_a_string_stays"
+   ]
+  },
+  {
+   "n": 9,
+   "result": 5,
+   "question": "At what depth is normalize_code in the result of _get_comment_remover? Answer with the number.",
+   "answer": 1
+  },
+  {
+   "n": 10,
+   "result": 12,
+   "question": "Does test_legacy_hash_is_invalidated_once (tests/unit/test_feedback_regressions.py) have a contract? Answer yes or no.",
+   "answer": "no"
+  },
+  {
+   "n": 11,
+   "result": 42,
+   "question": "What is the line number of the 3rd hit, in the order the result lists the hits?",
+   "answer": 29
+  },
+  {
+   "n": 12,
+   "result": 43,
+   "question": "What is the line number of the 3rd hit, in the order the result lists the hits?",
+   "answer": 29
+  },
+  {
+   "n": 13,
+   "result": 56,
+   "question": "Which file has the most hits? Give its path.",
+   "answer": "src/drspec/db/__init__.py"
+  },
+  {
+   "n": 14,
+   "result": 58,
+   "question": "Which hits are inside the function _clip#094207c6 (in src/drspec/core/live_search.py)? List their line numbers, ascending.",
+   "answer": [
+    69,
+    71,
+    74,
+    75,
+    76
+   ]
+  },
+  {
+   "n": 15,
+   "result": 63,
+   "question": "Which hits are inside the function live_search#bd2da4c6 (in src/drspec/core/live_search.py)? List their line numbers, ascending.",
+   "answer": [
+    247,
+    248,
+    293,
+    307,
+    308
+   ]
+  },
+  {
+   "n": 16,
+   "result": 24,
+   "question": "How many matched lines are there in all the blocks of the result?",
+   "answer": 2
+  },
+  {
+   "n": 17,
+   "result": 27,
+   "question": "In which function is the first block (src/drspec/mcp_server.py, lines 1912-1914)? Give name#hash, or none.",
+   "answer": "none"
+  },
+  {
+   "n": 18,
+   "result": 26,
+   "question": "How many functions does the result list?",
+   "answer": 2
+  },
+  {
+   "n": 19,
+   "result": 26,
+   "question": "Does the path src/drspec/staleness_worker.py appear in the result? Answer yes or no.",
+   "answer": "yes"
+  },
+  {
+   "n": 20,
+   "result": 26,
+   "question": "Does the path src/drspec/no_such_module.py appear in the result? Answer yes or no.",
+   "answer": "no"
+  }
+ ]
+}

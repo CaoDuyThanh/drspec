@@ -1,11 +1,4 @@
-"""Pattern extraction from bug-fix diffs.
-
-This module provides functionality to:
-- Extract failure patterns from code changes
-- Categorize patterns by type
-- Generate natural language descriptions
-- Map patterns to invariant types
-"""
+"""Pattern extraction from bug-fix diffs."""
 
 from __future__ import annotations
 
@@ -38,7 +31,6 @@ class PatternType(str, Enum):
     UNKNOWN = "unknown"
 
 
-# Pattern detection rules
 PATTERN_RULES: Dict[PatternType, List[str]] = {
     PatternType.NULL_CHECK: [
         r"if\s+\w+\s+is\s+None",
@@ -139,7 +131,6 @@ PATTERN_RULES: Dict[PatternType, List[str]] = {
     ],
 }
 
-# Invariant templates for each pattern type
 INVARIANT_TEMPLATES: Dict[PatternType, List[str]] = {
     PatternType.NULL_CHECK: [
         "{param} must not be None",
@@ -258,19 +249,17 @@ def categorize_pattern(
     Returns:
         Tuple of (pattern_type, confidence).
     """
-    # Combine added lines for pattern matching
     added_text = "\n".join(added_lines)
     removed_text = "\n".join(removed_lines)
 
     scores: Dict[PatternType, float] = {pt: 0.0 for pt in PatternType}
 
-    # Score each pattern type based on matches in added code
     for pattern_type, rules in PATTERN_RULES.items():
         for rule in rules:
             if re.search(rule, added_text, re.IGNORECASE):
                 scores[pattern_type] += 1.0
 
-    # Bonus for patterns that appear in added but not removed
+    # Extra weight when the rule is new rather than already present pre-fix
     for pattern_type, rules in PATTERN_RULES.items():
         for rule in rules:
             added_match = re.search(rule, added_text, re.IGNORECASE)
@@ -278,7 +267,6 @@ def categorize_pattern(
             if added_match and not removed_match:
                 scores[pattern_type] += 0.5
 
-    # Find best match
     best_type = PatternType.UNKNOWN
     best_score = 0.0
 
@@ -287,7 +275,6 @@ def categorize_pattern(
             best_type = pattern_type
             best_score = score
 
-    # Normalize confidence
     confidence = min(1.0, best_score / 3.0) if best_score > 0 else 0.0
 
     return best_type, confidence
@@ -326,10 +313,8 @@ def generate_pattern_description(
 
     base_desc = descriptions.get(pattern_type, "Unknown pattern")
 
-    # Try to extract more specific info from the code
     added_text = "\n".join(added_lines)
 
-    # Look for specific variable names
     var_match = re.search(r"if\s+(\w+)\s+is\s+", added_text)
     if var_match and pattern_type == PatternType.NULL_CHECK:
         return f"Added null check for '{var_match.group(1)}'"
@@ -353,7 +338,7 @@ def _get_invariant_suggestions(pattern_type: PatternType) -> List[str]:
     templates = INVARIANT_TEMPLATES.get(pattern_type, [])
     if not templates:
         return ["Code behavior should be verified"]
-    return templates[:2]  # Return first 2 suggestions
+    return templates[:2]
 
 
 def extract_patterns_from_diff(
@@ -385,13 +370,8 @@ def extract_patterns_from_diff(
         ):
             continue
 
-        # Categorize the pattern
         pattern_type, confidence = categorize_pattern(removed, added)
-
-        # Generate description
         description = generate_pattern_description(pattern_type, removed, added)
-
-        # Get invariant suggestions
         suggestions = _get_invariant_suggestions(pattern_type)
 
         pattern = ExtractedPattern(
@@ -426,7 +406,6 @@ def extract_all_patterns(
     """
     all_patterns: List[ExtractedPattern] = []
 
-    # Build function map
     func_map: Dict[str, str] = {}
     if modified_functions:
         for fid, fpath, fname in modified_functions:

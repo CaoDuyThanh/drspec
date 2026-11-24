@@ -11,6 +11,7 @@ from typing import Any
 
 import duckdb
 
+from drspec.core.identity import display_name
 from drspec.db import get_artifact, get_callees
 
 
@@ -137,7 +138,6 @@ def detect_missing_contracts(
     missing: list[MissingContract] = []
     priority = 1
 
-    # Check direct function first
     target_has_contract = _has_contract(conn, function_id)
 
     if not target_has_contract:
@@ -154,7 +154,6 @@ def detect_missing_contracts(
             ))
             priority += 1
 
-    # BFS through call chain
     visited = {function_id}
     queue: list[tuple[str, int]] = [(function_id, 0)]
 
@@ -164,7 +163,6 @@ def detect_missing_contracts(
         if depth >= max_depth:
             continue
 
-        # Get callees of current function
         callees = get_callees(conn, current_id)
 
         for callee_id in callees:
@@ -172,7 +170,6 @@ def detect_missing_contracts(
                 continue
             visited.add(callee_id)
 
-            # Check if callee has a contract
             if not _has_contract(conn, callee_id):
                 artifact = get_artifact(conn, callee_id)
                 if artifact:
@@ -190,10 +187,8 @@ def detect_missing_contracts(
                     ))
                     priority += 1
 
-            # Add to queue for further exploration
             queue.append((callee_id, depth + 1))
 
-    # Generate suggestion
     suggestion = _generate_suggestion(missing, function_id)
 
     return MissingContractReport(
@@ -216,7 +211,7 @@ def _generate_reason(relationship: str, depth: int, caller_id: str) -> str:
     Returns:
         Human-readable reason string.
     """
-    caller_name = caller_id.split("::")[-1] if "::" in caller_id else caller_id
+    caller_name = display_name(caller_id)
 
     if relationship == "callee":
         return (
@@ -275,7 +270,6 @@ def _generate_suggestion(
     lines.append("To build missing contracts:")
     lines.append("1. Activate the Architect Council")
 
-    # Add prioritized function list
     if len(missing) <= 3:
         for m in missing:
             lines.append(f"   - {m.function_id} (priority {m.priority})")
@@ -284,11 +278,10 @@ def _generate_suggestion(
         for m in missing[:3]:
             lines.append(f"     {m.function_id}")
 
-    # Add queue command example
     if missing:
         top_function = missing[0].function_id
         lines.append("")
-        lines.append(f'Example: drspec queue prioritize "{top_function}" 1')
+        lines.append(f'Example: drspec source get "{top_function}"')
 
     return "\n".join(lines)
 

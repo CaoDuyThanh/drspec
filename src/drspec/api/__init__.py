@@ -20,11 +20,6 @@ Example:
     if not result.passed:
         print(f"Failed: {result.error}")
 
-    # List pending queue
-    queue = api.list_queue(status="PENDING")
-    for item in queue:
-        print(f"{item.function_id} (priority: {item.priority})")
-
     # Get dependencies
     graph = api.get_dependencies("src/api.py::handle_request", depth=2)
     for node in graph.nodes:
@@ -35,14 +30,13 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from drspec.contracts.schema import Contract
-from drspec.db.connection import get_connection, get_db_path
+from drspec.db.connection import get_db_path
+from drspec.worker_ipc import WorkerIPCError, get_worker_connection
 from drspec.db.queries import (
-    QueueItem,
     get_contract as db_get_contract,
-    queue_peek,
 )
 from drspec.db.graph import (
     DependencyGraph,
@@ -82,6 +76,21 @@ class VerificationError(DrSpecError):
     """Verification script execution failed."""
 
     pass
+
+
+class DatabaseBusyError(DrSpecError):
+    """Could not reach the drspec worker process that owns the database."""
+
+    pass
+
+
+def _connect_readonly():
+    """Wraps WorkerIPCError as the public DatabaseBusyError so callers
+    don't need to import internal modules to catch it."""
+    try:
+        return get_worker_connection(_get_db_path(), read_only=True)
+    except WorkerIPCError as e:
+        raise DatabaseBusyError(f"Could not reach the drspec worker: {e}") from e
 
 
 # =============================================================================
@@ -189,12 +198,11 @@ def query_contract(function_id: str) -> Optional[Contract]:
     """
     _ensure_initialized()
 
-    conn = get_connection(_get_db_path())
+    conn = _connect_readonly()
     try:
         contract_row = db_get_contract(conn, function_id)
         if contract_row is None:
             return None
-        # Parse contract JSON into Contract object
         return Contract.from_json(contract_row["contract_json"])
     finally:
         conn.close()
@@ -232,7 +240,7 @@ def run_verification(
     """
     _ensure_initialized()
 
-    conn = get_connection(_get_db_path())
+    conn = _connect_readonly()
     try:
         contract_row = db_get_contract(conn, function_id)
         if contract_row is None:
@@ -240,13 +248,16 @@ def run_verification(
                 f"No contract found for function: {function_id}"
             )
 
-        # Parse contract JSON into Contract object
-        contract = Contract.from_json(contract_row["contract_json"])
+        from drspec.core.provenance import contract_freshness
 
-        # Generate verification script
+        freshness = contract_freshness(conn, function_id, contract_row)
+        if not freshness["current"]:
+            return RuntimeVerificationResult(function_id=function_id, passed=False, execution_time_ms=0.0,
+                                             error=f"Stale contract: {freshness['stale_reason']}")
+
+        contract = Contract.from_json(contract_row["contract_json"])
         script = generate_verification_script(contract, function_id)
 
-        # Build invariant info for detailed reporting
         invariant_info = [
             {
                 "name": inv.name,
@@ -256,7 +267,6 @@ def run_verification(
             for inv in contract.invariants
         ]
 
-        # Run verification
         return verify_at_runtime(
             function_id=function_id,
             script=script,
@@ -265,51 +275,6 @@ def run_verification(
             invariant_info=invariant_info,
             timeout=timeout,
         )
-    finally:
-        conn.close()
-
-
-def list_queue(
-    status: Optional[str] = None,
-    priority_min: Optional[int] = None,
-    limit: int = 100,
-) -> List[QueueItem]:
-    """List items in the processing queue.
-
-    Args:
-        status: Filter by status (PENDING, IN_PROGRESS, COMPLETED, FAILED).
-                If None, returns only PENDING items.
-        priority_min: Minimum priority to include (higher = more important).
-        limit: Maximum items to return.
-
-    Returns:
-        List of QueueItem objects, ordered by priority descending.
-
-    Raises:
-        NotInitializedError: If DrSpec is not initialized.
-
-    Example:
-        >>> queue = list_queue(status="PENDING", limit=10)
-        >>> for item in queue:
-        ...     print(f"{item.function_id} (priority: {item.priority})")
-    """
-    _ensure_initialized()
-
-    conn = get_connection(_get_db_path())
-    try:
-        # Use include_all=True if status is specified to get all statuses
-        include_all = status is not None
-        items = queue_peek(conn, count=limit, include_all=include_all)
-
-        # Filter by status if specified
-        if status is not None:
-            items = [item for item in items if item.status == status]
-
-        # Filter by priority if specified
-        if priority_min is not None:
-            items = [item for item in items if item.priority >= priority_min]
-
-        return items
     finally:
         conn.close()
 
@@ -340,7 +305,7 @@ def get_dependencies(
     """
     _ensure_initialized()
 
-    conn = get_connection(_get_db_path())
+    conn = _connect_readonly()
     try:
         return db_get_dependency_graph(conn, function_id, depth=depth, direction=direction)
     finally:
@@ -357,17 +322,16 @@ __all__ = [
     "NotInitializedError",
     "ContractNotFoundError",
     "VerificationError",
+    "DatabaseBusyError",
     # Configuration
     "configure",
     "is_initialized",
     # Public API
     "query_contract",
     "run_verification",
-    "list_queue",
     "get_dependencies",
     # Re-exported types for convenience
     "Contract",
-    "QueueItem",
     "DependencyGraph",
     "RuntimeVerificationResult",
 ]

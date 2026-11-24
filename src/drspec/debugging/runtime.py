@@ -38,11 +38,13 @@ def _get_safe_env() -> dict[str, str]:
         "PYTHONUNBUFFERED": "1",
     }
 
-    # Add Python-related paths if available
+    # PyInstaller child processes reuse the already extracted runtime.
+    if getattr(sys, "frozen", False):
+        safe_env.update({key: value for key, value in os.environ.items() if key.startswith("_PYI_")})
+
     if "PYTHONPATH" in os.environ:
         safe_env["PYTHONPATH"] = os.environ["PYTHONPATH"]
 
-    # Add virtual environment if active
     if "VIRTUAL_ENV" in os.environ:
         safe_env["VIRTUAL_ENV"] = os.environ["VIRTUAL_ENV"]
 
@@ -73,10 +75,12 @@ class InvariantResult:
     message: Optional[str] = None
     expected: Optional[Any] = None
     actual: Optional[Any] = None
+    status: str = "unverified"
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
+            "status": self.status,
             "name": self.name,
             "passed": self.passed,
             "criticality": self.criticality,
@@ -170,13 +174,11 @@ def serialize_for_verification(data: Any) -> Any:
         return {str(k): serialize_for_verification(v) for k, v in data.items()}
 
     if hasattr(data, "__dict__") and not isinstance(data, type):
-        # Object with attributes - serialize as dict with type info
         return {
             "__type__": type(data).__name__,
             **{k: serialize_for_verification(v) for k, v in data.__dict__.items()},
         }
 
-    # Primitives: int, float, str, bool
     return data
 
 
@@ -248,14 +250,11 @@ def verify_at_runtime(
     """
     start_time = time.time()
 
-    # Serialize complex data
     serialized_input = serialize_for_verification(input_data)
     serialized_output = serialize_for_verification(output_data)
 
-    # Create enhanced wrapper script for detailed reporting
     wrapper_script = _create_detailed_wrapper(script, invariant_info or [])
 
-    # Execute verification
     script_path = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -274,7 +273,7 @@ def verify_at_runtime(
 
         try:
             result = subprocess.run(
-                [sys.executable, script_path],
+                [sys.executable, *(["--drspec-internal-verify"] if getattr(sys, "frozen", False) else []), script_path],
                 input=input_json,
                 capture_output=True,
                 timeout=timeout,
@@ -340,7 +339,6 @@ def _create_detailed_wrapper(script: str, invariant_info: list[dict[str, str]]) 
     Returns:
         Enhanced wrapper script.
     """
-    # Encode invariant info as JSON for the script
     invariant_json = json.dumps(invariant_info)
 
     return f'''{script}
@@ -360,6 +358,12 @@ def _main():
 
         input_data = data["input"]
         output_data = data["output"]
+
+        if globals().get('DRSPEC_VERIFIER_VERSION') == 2:
+            checked = verify(input_data, output_data)
+            print(json.dumps({{"passed": checked["passed"], "invariants": [
+                dict(row, passed=row["status"] == "passed") for row in checked["results"]]}}))
+            return
 
         # Check each invariant individually
         invariant_results = []
@@ -452,6 +456,7 @@ def _parse_detailed_result(
     for inv_data in output.get("invariants", []):
         invariants.append(InvariantResult(
             name=inv_data.get("name", "unknown"),
+            status=inv_data.get("status", "unverified"),
             passed=inv_data.get("passed", False),
             criticality=inv_data.get("criticality", "MEDIUM"),
             message=inv_data.get("message"),
@@ -499,7 +504,6 @@ def verify_contract_at_runtime(
 
     start_time = time.time()
 
-    # Get contract from database
     contract_data = get_contract(conn, function_id)
     if contract_data is None:
         return RuntimeVerificationResult(
@@ -509,7 +513,14 @@ def verify_contract_at_runtime(
             error=f"No contract found for function: {function_id}",
         )
 
-    # Parse contract
+    from drspec.core.provenance import contract_freshness
+
+    freshness = contract_freshness(conn, function_id, contract_data)
+    if not freshness["current"]:
+        return RuntimeVerificationResult(function_id=function_id, passed=False,
+                                         execution_time_ms=(time.time() - start_time) * 1000,
+                                         error=f"Stale contract: {freshness['stale_reason']}")
+
     try:
         contract = Contract.from_json(contract_data["contract_json"])
     except Exception as e:
@@ -520,12 +531,10 @@ def verify_contract_at_runtime(
             error=f"Failed to parse contract: {e}",
         )
 
-    # Get or generate verification script
     script = contract_data.get("verification_script")
     if not script:
         script = generate_verification_script(contract, function_id)
 
-    # Build invariant info for detailed reporting
     invariant_info = [
         {
             "name": inv.name,
@@ -535,7 +544,6 @@ def verify_contract_at_runtime(
         for inv in contract.invariants
     ]
 
-    # Perform verification
     return verify_at_runtime(
         function_id=function_id,
         script=script,

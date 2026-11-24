@@ -124,25 +124,20 @@ def identify_root_cause(
     Returns:
         RootCauseReport with candidate root cause lines.
     """
-    # Check source freshness
     current_hash = hashlib.sha256(source_code.encode()).hexdigest()
     source_is_current = stored_hash is None or current_hash == stored_hash
 
-    # Analyze for root cause candidates
     candidates = _analyze_source_for_root_cause(
         source_code=source_code,
         violation=violation,
         start_line=start_line,
     )
 
-    # Sort by confidence
     candidates = sorted(candidates, key=lambda c: c.confidence, reverse=True)
 
-    # Separate primary and secondary
     primary = candidates[0] if candidates else None
-    secondary = candidates[1:5] if len(candidates) > 1 else []  # Top 4 secondary
+    secondary = candidates[1:5] if len(candidates) > 1 else []  # top 4 secondary
 
-    # Generate recommendation
     recommendation = _generate_recommendation(violation, primary)
 
     return RootCauseReport(
@@ -178,63 +173,52 @@ def _analyze_source_for_root_cause(
     actual_lower = (violation.actual or "").lower()
     name_lower = violation.invariant_name.lower()
 
-    # Extract keywords from violation
     keywords = _extract_keywords(violation)
 
-    # Pattern analysis
     for i, line in enumerate(lines):
         line_lower = line.lower()
         line_number = start_line + i
         confidence = 0.0
         explanations = []
 
-        # Pattern 1: Keyword matching
         matched_keywords = [kw for kw in keywords if kw in line_lower]
         if matched_keywords:
             confidence += 0.3
             explanations.append(f"Contains relevant keywords: {', '.join(matched_keywords)}")
 
-        # Pattern 2: Duplicate-related violations
         if "duplicate" in name_lower or "duplicate" in violation_lower or "unique" in name_lower:
             if _is_collection_add(line):
                 if not _has_check_before(lines, i, ["not in", "if", "check"]):
                     confidence += 0.4
                     explanations.append("Adds to collection without duplicate check")
 
-        # Pattern 3: Null/None violations
         if "null" in name_lower or "none" in actual_lower or "null" in actual_lower:
             if _might_return_none(line):
                 confidence += 0.35
                 explanations.append("Could return or assign None without check")
 
-        # Pattern 4: Negative/positive violations
         if "negative" in actual_lower or "positive" in name_lower:
             if _is_arithmetic_operation(line):
                 confidence += 0.3
                 explanations.append("Arithmetic operation that could produce invalid values")
 
-        # Pattern 5: Empty check violations
         if "empty" in name_lower or "empty" in violation_lower:
             if "return" in line_lower and ("[]" in line or "{}" in line or '""' in line):
                 confidence += 0.4
                 explanations.append("Returns empty collection/string")
 
-        # Pattern 6: Return statements (often root cause for output violations)
         if "return" in line_lower:
             confidence += 0.15
             explanations.append("Return statement affecting output")
 
-        # Pattern 7: Assignment to result variables
         if _is_result_assignment(line):
             confidence += 0.2
             explanations.append("Assignment to potential output variable")
 
-        # Pattern 8: Conditional without else (potential missing case)
         if line.strip().startswith("if ") and not _has_else_following(lines, i):
             confidence += 0.1
             explanations.append("Conditional without else clause")
 
-        # Only add as candidate if confidence is above threshold
         if confidence >= 0.25 and explanations:
             snippet = _extract_snippet(lines, i, context=2)
             candidates.append(RootCauseCandidate(
@@ -259,20 +243,16 @@ def _extract_keywords(violation: ViolationDetail) -> list[str]:
     """
     keywords = set()
 
-    # From invariant name (split on underscore)
     for part in violation.invariant_name.lower().split("_"):
         if len(part) >= 3:
             keywords.add(part)
 
-    # From actual value
     if violation.actual:
-        # Extract identifiers from actual
         words = re.findall(r"\b[a-z_][a-z0-9_]*\b", violation.actual.lower())
         for word in words:
             if len(word) >= 3:
                 keywords.add(word)
 
-    # Common violation-related keywords
     violation_keywords = {
         "duplicate": ["duplicate", "add", "append", "extend", "insert"],
         "null": ["none", "null", "return", "="],
@@ -298,7 +278,6 @@ def _is_collection_add(line: str) -> bool:
 
 def _has_check_before(lines: list[str], index: int, check_keywords: list[str]) -> bool:
     """Check if there's a validation check before the given line."""
-    # Look at previous 3 lines
     for i in range(max(0, index - 3), index):
         line_lower = lines[i].lower()
         if any(kw in line_lower for kw in check_keywords):
@@ -326,12 +305,11 @@ def _is_result_assignment(line: str) -> bool:
 
 def _has_else_following(lines: list[str], index: int) -> bool:
     """Check if there's an else clause following an if statement."""
-    # Look at next 5 lines for else
     for i in range(index + 1, min(len(lines), index + 6)):
         stripped = lines[i].strip()
         if stripped.startswith("else:") or stripped.startswith("elif "):
             return True
-        # If we hit another if at same indentation, stop
+        # Same-indentation if means a new conditional, not this one's else
         if stripped.startswith("if ") and len(lines[index]) - len(lines[index].lstrip()) == len(lines[i]) - len(lines[i].lstrip()):
             return False
     return False
@@ -379,7 +357,6 @@ def _generate_recommendation(
     name_lower = violation.invariant_name.lower()
     logic_lower = (violation.invariant_logic or "").lower()
 
-    # Generate specific recommendations based on violation type
     if "duplicate" in name_lower or "unique" in name_lower:
         return f"Add a uniqueness check before line {primary.line_number}. Consider using a set or checking membership before adding."
 
@@ -395,7 +372,6 @@ def _generate_recommendation(
     if "range" in name_lower or "bound" in name_lower:
         return f"Add boundary checks at line {primary.line_number}. Validate input is within acceptable range."
 
-    # Generic recommendation
     return f"Review line {primary.line_number}: {primary.explanation}. Consider adding validation to ensure the invariant holds."
 
 

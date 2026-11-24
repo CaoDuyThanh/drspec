@@ -1,95 +1,90 @@
-"""Tests for core resources module."""
+"""Tests for core resources module: where the agent templates and the schema are, from source and from a PyInstaller bundle.
 
+From source the paths are in the package folder; frozen, they are under `sys._MEIPASS`, at the places `pyinstaller.spec` puts them. A frozen
+path that no longer matches the spec is a binary that cannot find its templates, which nothing else would notice before a release."""
+
+import re
+import sys
 from pathlib import Path
 
+import pytest
 
+import drspec
+import drspec.db.connection
 from drspec.core.resources import (
-    get_templates_path,
-    get_schema_path,
-    list_template_files,
     _get_base_path,
+    get_schema_path,
+    get_templates_path,
+    list_template_files,
 )
+
+pytestmark = pytest.mark.unit  # paths, and reading files of the repository
+
+PACKAGE = Path(drspec.__file__).parent
+TEMPLATES = {"critic.md", "debugger.md", "judge.md", "librarian.md", "proposer.md", "vision_analyst.md"}
+
+
+@pytest.fixture
+def frozen(tmp_path, monkeypatch):
+    """The module as PyInstaller runs it: `sys.frozen` set and `sys._MEIPASS` the folder of the bundle."""
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path), raising=False)
+    return tmp_path
 
 
 class TestGetBasePath:
-    """Tests for the _get_base_path function."""
+    def test_from_source_it_is_the_folder_that_holds_the_package(self):
+        assert _get_base_path() == PACKAGE.parent  # src/, which holds drspec/
 
-    def test_returns_path_in_development(self):
-        """In development, returns src/ directory."""
-        base = _get_base_path()
-        # Should be src/ directory with agents folder
-        assert (base / "agents").exists() or (base / "drspec").exists()
-
-    def test_returns_path_object(self):
-        """Returns a Path object."""
-        base = _get_base_path()
-        assert isinstance(base, Path)
+    def test_frozen_it_is_the_folder_of_the_bundle(self, frozen):
+        assert _get_base_path() == frozen
+        assert isinstance(_get_base_path(), Path)
 
 
 class TestGetTemplatesPath:
-    """Tests for get_templates_path function."""
+    def test_from_source_the_templates_are_in_the_package(self):
+        assert get_templates_path() == PACKAGE / "agents"
+        assert get_templates_path().is_dir()
 
-    def test_returns_templates_agents_path(self):
-        """Returns path ending with agents/."""
-        path = get_templates_path()
-        assert path.name == "agents"
-        # In development, agents are in src/drspec/agents
-        assert path.parent.name == "drspec"
+    def test_the_templates_are_the_six_agents(self):
+        assert {p.name for p in get_templates_path().glob("*.md")} == TEMPLATES
 
-    def test_templates_directory_exists(self):
-        """Templates directory should exist in development."""
-        path = get_templates_path()
-        assert path.exists()
-
-    def test_contains_agent_templates(self):
-        """Templates directory should contain agent markdown files."""
-        path = get_templates_path()
-        templates = list(path.glob("*.md"))
-        assert len(templates) >= 3  # At minimum: librarian, proposer, critic
+    def test_frozen_they_are_in_agents_under_the_bundle(self, frozen):
+        assert get_templates_path() == frozen / "agents"
 
 
 class TestGetSchemaPath:
-    """Tests for get_schema_path function."""
+    def test_from_source_it_is_the_file_init_schema_reads(self):
+        # two places find `schema.sql` (here and `db.connection.init_schema`): they must find the same file
+        assert get_schema_path() == Path(drspec.db.connection.__file__).parent / "schema.sql"
+        assert get_schema_path() == PACKAGE / "db" / "schema.sql"
 
-    def test_returns_schema_sql_path(self):
-        """Returns path to schema.sql."""
-        path = get_schema_path()
-        assert path.name == "schema.sql"
-        assert path.parent.name == "db"
+    def test_the_schema_file_declares_the_project_tables(self):
+        content = get_schema_path().read_text()
 
-    def test_schema_file_exists(self):
-        """Schema file should exist."""
-        path = get_schema_path()
-        assert path.exists()
+        assert {"artifacts", "contracts", "dependencies", "config"} <= set(re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)", content))
 
-    def test_schema_file_is_readable(self):
-        """Schema file should be readable."""
-        path = get_schema_path()
-        content = path.read_text()
-        assert "CREATE TABLE" in content
-        assert "artifacts" in content
+    def test_frozen_it_is_in_drspec_db_under_the_bundle(self, frozen):
+        assert get_schema_path() == frozen / "drspec" / "db" / "schema.sql"
 
 
 class TestListTemplateFiles:
-    """Tests for list_template_files function."""
-
-    def test_returns_list_of_filenames(self):
-        """Returns list of .md filenames."""
+    def test_returns_the_markdown_files_of_the_templates_folder(self):
         files = list_template_files()
+
         assert isinstance(files, list)
-        assert all(f.endswith(".md") for f in files)
-
-    def test_includes_required_templates(self):
-        """Includes all required agent templates."""
-        files = list_template_files()
-        # Should have at least these templates
-        assert "librarian.md" in files
-        assert "proposer.md" in files
-        assert "critic.md" in files
+        assert sorted(files) == sorted(TEMPLATES)  # the six agents, and not the `helpers` and `templates` folders next to them
 
     def test_includes_all_five_templates(self):
-        """Includes all five agent templates."""
         files = list_template_files()
         required = ["librarian.md", "proposer.md", "critic.md", "judge.md", "debugger.md"]
         for template in required:
             assert template in files, f"Missing template: {template}"
+
+    def test_frozen_it_lists_the_bundle_and_only_markdown(self, frozen):
+        (frozen / "agents").mkdir()
+        (frozen / "agents" / "a.md").write_text("x")
+        (frozen / "agents" / "b.txt").write_text("x")
+        (frozen / "agents" / "sub").mkdir()
+
+        assert list_template_files() == ["a.md"]

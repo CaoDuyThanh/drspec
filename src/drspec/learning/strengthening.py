@@ -1,11 +1,4 @@
-"""Contract strengthening from bug patterns.
-
-This module provides functionality to:
-- Match patterns to existing contracts
-- Suggest new invariants from patterns
-- Boost confidence for validated contracts
-- Track validation history
-"""
+"""Contract strengthening from bug patterns."""
 
 from __future__ import annotations
 
@@ -16,7 +9,6 @@ from drspec.contracts.schema import Contract, Invariant, Criticality, OnFail
 from drspec.learning.patterns import ExtractedPattern, PatternType
 
 
-# Map pattern types to criticality levels
 PATTERN_CRITICALITY: Dict[PatternType, Criticality] = {
     PatternType.NULL_CHECK: Criticality.HIGH,
     PatternType.BOUNDS_CHECK: Criticality.HIGH,
@@ -33,9 +25,8 @@ PATTERN_CRITICALITY: Dict[PatternType, Criticality] = {
     PatternType.UNKNOWN: Criticality.LOW,
 }
 
-# Confidence boost amounts
-CONFIDENCE_BOOST_BUG_FIX = 0.05  # Boost when pattern validates existing invariant
-CONFIDENCE_BOOST_VALIDATED = 0.10  # Boost when invariant is fully validated
+CONFIDENCE_BOOST_BUG_FIX = 0.05  # pattern validates an existing invariant
+CONFIDENCE_BOOST_VALIDATED = 0.10  # invariant is fully validated
 
 
 @dataclass
@@ -137,7 +128,6 @@ def match_pattern_to_contract(
     """
     matches: List[str] = []
 
-    # Keywords to look for based on pattern type
     keywords: Dict[PatternType, List[str]] = {
         PatternType.NULL_CHECK: ["none", "null", "not none", "is not none"],
         PatternType.BOUNDS_CHECK: ["bounds", "length", "size", "index", "within"],
@@ -225,7 +215,6 @@ def strengthen_contract(
     seen_invariant_names: set = set()
 
     for pattern in patterns:
-        # Check for matches with existing contract
         if existing_contract:
             matches = match_pattern_to_contract(pattern, existing_contract)
             for match in matches:
@@ -233,26 +222,21 @@ def strengthen_contract(
                     result.validated_invariants.append(match)
                     result.confidence_boost += CONFIDENCE_BOOST_BUG_FIX
 
-        # Generate new invariant suggestions
         suggestions = suggest_invariants(pattern)
         for suggestion in suggestions:
-            # Skip if we already have a similar invariant
             if existing_contract:
                 existing_names = {inv.name for inv in existing_contract.invariants}
                 if suggestion.name in existing_names:
                     continue
 
-            # Skip duplicates
             if suggestion.name in seen_invariant_names:
                 continue
 
             seen_invariant_names.add(suggestion.name)
             result.new_invariants.append(suggestion)
 
-    # Cap confidence boost
     result.confidence_boost = min(0.25, result.confidence_boost)
 
-    # Generate recommendations
     if result.validated_invariants:
         result.recommendations.append(
             f"Bug fix validated {len(result.validated_invariants)} existing invariant(s). "
@@ -289,14 +273,12 @@ def apply_strengthening(
     Returns:
         Tuple of (updated_contract, new_confidence_score).
     """
-    # Create new invariants list
     new_invariants = list(contract.invariants)
 
     if add_new_invariants:
         for suggestion in strengthening.new_invariants:
             new_invariants.append(suggestion.to_invariant())
 
-    # Create updated contract
     updated = Contract(
         function_signature=contract.function_signature,
         intent_summary=contract.intent_summary,
@@ -304,5 +286,4 @@ def apply_strengthening(
         io_examples=contract.io_examples,
     )
 
-    # Return with confidence boost
     return updated, strengthening.confidence_boost

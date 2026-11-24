@@ -1,11 +1,4 @@
-"""Learning history storage and queries.
-
-This module provides functionality to:
-- Store learning events from bug analysis
-- Query learning history
-- Track contract modifications
-- Generate analytics on learning effectiveness
-"""
+"""Learning history storage and queries."""
 
 from __future__ import annotations
 
@@ -18,8 +11,7 @@ import duckdb
 from drspec.learning.patterns import PatternType
 
 
-# Schema for learning history table
-# Note: DuckDB requires explicit sequence for auto-increment
+# DuckDB has no auto-increment; the sequence provides it explicitly.
 LEARNING_HISTORY_SCHEMA = """
 CREATE SEQUENCE IF NOT EXISTS learning_history_seq;
 
@@ -130,7 +122,6 @@ def insert_learning_event(
     Returns:
         The ID of the inserted event.
     """
-    # Ensure schema exists
     init_learning_schema(conn)
 
     result = conn.execute(
@@ -145,7 +136,7 @@ def insert_learning_event(
         """,
         [
             event.commit_sha,
-            event.commit_message[:500] if event.commit_message else None,  # Truncate
+            event.commit_message[:500] if event.commit_message else None,
             event.function_id,
             event.pattern_type.value if event.pattern_type else None,
             event.pattern_description[:1000] if event.pattern_description else None,
@@ -229,10 +220,8 @@ def get_learning_stats(
     Returns:
         Dictionary with learning statistics.
     """
-    # Ensure schema exists
     init_learning_schema(conn)
 
-    # Overall counts
     counts = conn.execute(
         """
         SELECT
@@ -247,7 +236,6 @@ def get_learning_stats(
         """
     ).fetchone()
 
-    # Pattern type distribution
     pattern_dist = conn.execute(
         """
         SELECT pattern_type, COUNT(*) as count
@@ -258,15 +246,14 @@ def get_learning_stats(
         """
     ).fetchall()
 
-    # Recent activity (last 7 days)
     recent = conn.execute(
         """
         SELECT
-            DATE(created_at) as date,
+            CAST(created_at AS DATE) as date,
             COUNT(*) as events
         FROM learning_history
         WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
-        GROUP BY DATE(created_at)
+        GROUP BY CAST(created_at AS DATE)
         ORDER BY date DESC
         """
     ).fetchall()
@@ -360,7 +347,6 @@ def export_learning_report(
             "events": [e.to_dict() for e in events],
         }, indent=2, default=str)
 
-    # Markdown format
     lines = [
         "# DrSpec Learning Report",
         "",

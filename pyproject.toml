@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "drspec"
-version = "0.2.0"
+version = "1.0.0"
 description = "AI-powered design-by-contract specification tool for runtime verification"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.8"
+requires-python = ">=3.8,<3.13"
 authors = [
     { name = "Thanh" }
 ]
@@ -33,9 +33,14 @@ dependencies = [
     "tree-sitter>=0.21.0,<0.22.0",
     "tree-sitter-python>=0.21.0,<0.22.0",
     "tree-sitter-javascript>=0.21.0,<0.22.0",
+    "tree-sitter-typescript>=0.21.0,<0.22.0",
     "tree-sitter-cpp>=0.21.0,<0.22.0",
+    "tree-sitter-rust>=0.21.2,<0.22.0",
     "matplotlib>=3.5.0",
     "networkx>=3.0",
+    "fastembed==0.4.2",
+    "tokenizers==0.20.3",
+    "pyyaml>=6.0",
 ]
 
 [project.urls]
@@ -48,8 +53,10 @@ Documentation = "https://github.com/CaoDuyThanh/drspec#readme"
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "pytest-xdist>=3.0",
     "pytest-asyncio>=0.21.0",
     "pyinstaller>=6.0",
+    "ruff==0.14.13",
 ]
 
 [project.scripts]
@@ -58,11 +65,9 @@ drspec = "drspec.cli.app:app"
 [tool.hatch.build.targets.wheel]
 packages = ["src/drspec"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"src/drspec/agents" = "drspec/agents"
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v"
+addopts = "-v -m 'not socket and not slow'"
+markers = ["unit: no process, socket, sleep, DuckDB file or CLI runner (budget 50 ms CPU)", "component: in-process with a DuckDB file or the CLI runner, no process (budget 250 ms CPU)", "integration: starts a process, socket or sleeps (budget 5 s CPU); slow and socket imply it", "socket: requires localhost socket access", "slow: starts real worker or parser processes and takes several seconds; the default run leaves it out, CI and 'pytest -m \"not socket\"' run it"]
