@@ -12,11 +12,10 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 
-# Default timeout in seconds
 DEFAULT_TIMEOUT = 1.0
 
 
@@ -40,9 +39,24 @@ class VerificationResult:
     invariants_checked: int = 0
     invariants_passed: int = 0
 
+    status: str = "unverified"
+    results: list[dict[str, Any]] = field(default_factory=list)
+    invariants_failed: int = 0
+    invariants_skipped: int = 0
+    invariants_error: int = 0
+
+    def __post_init__(self) -> None:
+        if self.error:
+            self.status = "error"
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
+            "status": self.status,
+            "results": self.results,
+            "invariants_failed": self.invariants_failed,
+            "invariants_skipped": self.invariants_skipped,
+            "invariants_error": self.invariants_error,
             "passed": self.passed,
             "message": self.message,
             "execution_time": self.execution_time,
@@ -74,10 +88,8 @@ def execute_verification(
     """
     start_time = time.time()
 
-    # Create a wrapper script that imports the verify function and runs it
     wrapper_script = _create_wrapper_script(script)
 
-    # Create temporary script file
     script_path = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -89,16 +101,14 @@ def execute_verification(
             f.write(wrapper_script)
             script_path = f.name
 
-        # Prepare input data as JSON
         input_json = json.dumps({
             "input": input_data,
             "output": output_data,
         })
 
-        # Execute in subprocess
         try:
             result = subprocess.run(
-                [sys.executable, script_path],
+                [sys.executable, *(["--drspec-internal-verify"] if getattr(sys, "frozen", False) else []), script_path],
                 input=input_json,
                 capture_output=True,
                 timeout=timeout,
@@ -108,7 +118,6 @@ def execute_verification(
 
             execution_time = time.time() - start_time
 
-            # Check for subprocess errors
             if result.returncode != 0:
                 error_msg = result.stderr.strip() if result.stderr else "Unknown error"
                 return VerificationResult(
@@ -118,14 +127,18 @@ def execute_verification(
                     error="EXECUTION_ERROR",
                 )
 
-            # Parse the output
             try:
                 output = json.loads(result.stdout)
                 return VerificationResult(
                     passed=output.get("passed", False),
                     message=output.get("message", "No message"),
                     execution_time=execution_time,
-                    error=None,
+                    error=output.get("error"),
+                    status=output.get("status", "unverified"),
+                    results=output.get("results", []),
+                    invariants_failed=output.get("invariants_failed", 0),
+                    invariants_skipped=output.get("invariants_skipped", 0),
+                    invariants_error=output.get("invariants_error", 0),
                     invariants_checked=output.get("invariants_checked", 0),
                     invariants_passed=output.get("invariants_passed", 0),
                 )
@@ -156,7 +169,6 @@ def execute_verification(
             )
 
     finally:
-        # Clean up temporary file
         if script_path and os.path.exists(script_path):
             try:
                 os.unlink(script_path)
@@ -186,35 +198,21 @@ def _main():
         data = json.loads(input_json)
 
         # Execute verification
-        passed, message = verify(data["input"], data["output"])
+        result = verify(data["input"], data["output"])
+        if not isinstance(result, dict):
+            # Custom legacy scripts remain usable, but have no per-rule evidence.
+            passed, message = result
+            result = {{"passed": bool(passed), "message": message,
+                       "status": "legacy", "invariants_checked": 0, "invariants_passed": 0}}
 
-        # Count invariants (estimate from message)
-        invariants_checked = 0
-        invariants_passed = 0
-        if passed:
-            # Try to extract count from success message like "All 3 invariant(s) passed"
-            import re
-            match = re.search(r"(\\d+)\\s+invariant", message)
-            if match:
-                invariants_checked = int(match.group(1))
-                invariants_passed = invariants_checked
-        else:
-            # For failures, we know at least one failed
-            invariants_checked = 1
-
-        # Output result as JSON
-        result = {{
-            "passed": passed,
-            "message": message,
-            "invariants_checked": invariants_checked,
-            "invariants_passed": invariants_passed,
-        }}
         print(json.dumps(result))
 
     except Exception as e:
         result = {{
             "passed": False,
             "message": f"Verification error: {{str(e)}}",
+            "status": "error",
+            "error": "EXECUTION_ERROR",
             "invariants_checked": 0,
             "invariants_passed": 0,
         }}
@@ -242,11 +240,13 @@ def _get_safe_env() -> dict[str, str]:
         "PYTHONUNBUFFERED": "1",
     }
 
-    # Add Python-related paths if available
+    # PyInstaller child processes reuse the already extracted runtime.
+    if getattr(sys, "frozen", False):
+        safe_env.update({key: value for key, value in os.environ.items() if key.startswith("_PYI_")})
+
     if "PYTHONPATH" in os.environ:
         safe_env["PYTHONPATH"] = os.environ["PYTHONPATH"]
 
-    # Add virtual environment if active
     if "VIRTUAL_ENV" in os.environ:
         safe_env["VIRTUAL_ENV"] = os.environ["VIRTUAL_ENV"]
 

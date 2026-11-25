@@ -134,25 +134,20 @@ def identify_violations(
     passed_count = sum(1 for inv in result.invariants if inv.passed)
     failed_count = total_invariants - passed_count
 
-    # Build invariant info lookup
     info_lookup = {}
     if invariant_info:
         for info in invariant_info:
             info_lookup[info.get("name", "")] = info
 
-    # Identify violations
     violations = []
     for i, inv_result in enumerate(result.invariants):
         if not inv_result.passed:
-            # Get additional info if available
             info = info_lookup.get(inv_result.name, {})
             logic = info.get("logic", inv_result.message or "")
             on_fail = info.get("on_fail", "error")
 
-            # Parse expected/actual from message
             expected, actual = _parse_expected_actual(inv_result)
 
-            # Generate suggestion
             suggestion = _generate_suggestion(inv_result, logic)
 
             violation = ViolationDetail(
@@ -167,13 +162,10 @@ def identify_violations(
             )
             violations.append(violation)
 
-    # Sort by criticality (HIGH first)
     violations = _sort_by_criticality(violations)
 
-    # Determine most critical
     most_critical = violations[0] if violations else None
 
-    # Generate summary
     summary = _generate_summary(result.function_id, total_invariants, violations)
 
     return ViolationReport(
@@ -208,18 +200,15 @@ def _parse_expected_actual(inv_result: InvariantResult) -> tuple[Optional[str], 
     Returns:
         Tuple of (expected, actual) strings.
     """
-    # If explicitly provided, use those
     if inv_result.expected is not None or inv_result.actual is not None:
         expected = str(inv_result.expected) if inv_result.expected is not None else None
         actual = str(inv_result.actual) if inv_result.actual is not None else None
         return expected, actual
 
-    # Try to parse from message
     message = inv_result.message or ""
     expected = None
     actual = None
 
-    # Common message patterns
     if "violated:" in message.lower():
         # Format: "Invariant violated: <logic>"
         parts = message.split(":", 1)
@@ -250,7 +239,6 @@ def _generate_suggestion(inv_result: InvariantResult, logic: str) -> str:
     logic_lower = logic.lower()
     name_lower = inv_result.name.lower()
 
-    # Pattern matching for common violation types
     if "duplicate" in message or "duplicate" in logic_lower or "unique" in name_lower:
         return "Check for missing uniqueness validation or deduplication logic"
 
@@ -311,8 +299,7 @@ def _generate_summary(
         v = violations[0]
         return f"1 of {total_invariants} invariants violated: {v.invariant_name} ({v.criticality})"
 
-    # Multiple violations
-    most_critical = violations[0]  # Already sorted by criticality
+    most_critical = violations[0]  # already sorted by criticality
     return (
         f"{failed_count} of {total_invariants} invariants violated. "
         f"Most critical: {most_critical.invariant_name} ({most_critical.criticality})"

@@ -1,0 +1,111 @@
+{
+ "tests/helpers.py": {
+  "duckdb-file": 1
+ },
+ "tests/integration/test_init_ide.py": {
+  "init-for-setup": 18
+ },
+ "tests/tools/test_disk_counts.py": {
+  "duckdb-file": 2
+ },
+ "tests/tools/test_tier_tools.py": {
+  "skip-on-machine": 1
+ },
+ "tests/unit/test_api.py": {
+  "duckdb-file": 1
+ },
+ "tests/unit/test_cli_commands.py": {
+  "init-for-setup": 8
+ },
+ "tests/unit/test_cpp_recovery.py": {
+  "init-for-setup": 1
+ },
+ "tests/unit/test_deps_command.py": {
+  "duckdb-file": 2
+ },
+ "tests/unit/test_docs.py": {
+  "duckdb-file": 5,
+  "init-for-setup": 1,
+  "real-sleep": 2
+ },
+ "tests/unit/test_drain.py": {
+  "init-for-setup": 1
+ },
+ "tests/unit/test_executor.py": {
+  "real-sleep": 1
+ },
+ "tests/unit/test_fakes.py": {
+  "duckdb-file": 1
+ },
+ "tests/unit/test_identity_migration.py": {
+  "duckdb-file": 15,
+  "init-for-setup": 1,
+  "slow-socket-model-marker": 1
+ },
+ "tests/unit/test_incremental_resolution.py": {
+  "duckdb-file": 5
+ },
+ "tests/unit/test_init_command.py": {
+  "duckdb-file": 5,
+  "init-for-setup": 2
+ },
+ "tests/unit/test_js_support.py": {
+  "duckdb-file": 3,
+  "init-for-setup": 1
+ },
+ "tests/unit/test_learn_command.py": {
+  "duckdb-file": 1,
+  "init-for-setup": 2
+ },
+ "tests/unit/test_learning.py": {
+  "duckdb-file": 1
+ },
+ "tests/unit/test_mcp_registration.py": {
+  "init-for-setup": 2
+ },
+ "tests/unit/test_mcp_server.py": {
+  "init-for-setup": 10
+ },
+ "tests/unit/test_project_files.py": {
+  "duckdb-file": 1
+ },
+ "tests/unit/test_project_root.py": {
+  "init-for-setup": 2
+ },
+ "tests/unit/test_runtime_verification.py": {
+  "real-sleep": 2
+ },
+ "tests/unit/test_scan_cancel.py": {
+  "init-for-setup": 1,
+  "real-sleep": 4,
+  "real-subprocess": 3,
+  "slow-socket-model-marker": 1
+ },
+ "tests/unit/test_scan_command.py": {
+  "duckdb-file": 1,
+  "init-for-setup": 1
+ },
+ "tests/unit/test_scan_pipeline.py": {
+  "duckdb-file": 1,
+  "init-for-setup": 1
+ },
+ "tests/unit/test_scan_progress.py": {
+  "real-sleep": 1
+ },
+ "tests/unit/test_shared_documents.py": {
+  "duckdb-file": 5,
+  "init-for-setup": 1
+ },
+ "tests/unit/test_tracing.py": {
+  "init-for-setup": 1
+ },
+ "tests/unit/test_verify_command.py": {
+  "real-time-assert": 1
+ },
+ "tests/unit/test_worker_build.py": {
+  "init-for-setup": 2
+ },
+ "tests/unit/test_worker_command.py": {
+  "init-for-setup": 1
+ }
+}

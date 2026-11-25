@@ -1,10 +1,7 @@
-"""Tests for version and package structure."""
-
 from pathlib import Path
 
 
 def test_version_exists():
-    """Test that __version__ is defined."""
     from drspec import __version__
 
     assert __version__ is not None
@@ -12,7 +9,6 @@ def test_version_exists():
 
 
 def test_version_format():
-    """Test that version follows semver format."""
     from drspec import __version__
 
     parts = __version__.split(".")
@@ -23,10 +19,9 @@ def test_version_format():
 
 
 def test_version_matches_version_file():
-    """Test that __version__ matches VERSION file (single source of truth)."""
+    """VERSION file is the single source of truth __version__ is synced from."""
     from drspec import __version__
 
-    # Read from VERSION file which is the single source of truth
     version_file = Path(__file__).parent.parent.parent / "VERSION"
     assert version_file.exists(), "VERSION file not found at project root"
 

@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import List, Optional
 
 
-# IDE choices for selection
 IDE_CHOICES = [
     ("Cursor", "cursor"),
     ("Claude Code", "claude-code"),
@@ -78,13 +77,11 @@ def prompt_multi_select(prompt: str, choices: List[tuple[str, str]], preselected
         try:
             response = input("\nSelect options: ").strip()
 
-            # Empty response = skip
             if not response:
                 return []
 
             indices = [int(x.strip()) for x in response.split(",")]
 
-            # Check for "None" option
             if len(choices) + 1 in indices:
                 return []
 
@@ -122,7 +119,6 @@ def prompt_choice(prompt: str, choices: List[tuple[str, str]], default: Optional
         try:
             response = input("\nSelect option: ").strip()
 
-            # Empty response = default
             if not response and default:
                 return default
 
@@ -169,7 +165,6 @@ def prompt_ide_selection(project_dir: Path) -> list[str]:
     if not is_interactive():
         return []
 
-    # Detect existing IDEs to pre-select
     detected = detect_existing_ides(project_dir)
 
     return prompt_multi_select(
@@ -186,7 +181,7 @@ def prompt_codex_location() -> str:
         "global" for ~/.codex/prompts/ or "project" for .codex/prompts/.
     """
     if not is_interactive():
-        return "project"  # Default to project-local
+        return "project"
 
     return prompt_choice(
         "Where should Codex prompts be installed?",
@@ -225,16 +220,16 @@ def prompt_confidence_threshold(current: int = 70) -> int:
             print("Invalid input. Enter a number.")
 
 
-# Project root markers (in order of priority)
+# Order determines search priority when multiple markers are present.
 PROJECT_ROOT_MARKERS = [
-    ".git",           # Git repository
-    "pyproject.toml", # Python project
-    "package.json",   # Node.js project
-    "Cargo.toml",     # Rust project
-    "go.mod",         # Go project
-    "pom.xml",        # Maven project
-    "build.gradle",   # Gradle project
-    "Makefile",       # Make project
+    ".git",
+    "pyproject.toml",
+    "package.json",
+    "Cargo.toml",
+    "go.mod",
+    "pom.xml",
+    "build.gradle",
+    "Makefile",
 ]
 
 
@@ -257,15 +252,13 @@ def detect_project_root(cwd: Path) -> Path:
                 return current
         current = current.parent
 
-    # No markers found, default to current directory
     return cwd.resolve()
 
 
 def prompt_project_root(cwd: Path, detected: Path) -> Path:
     """Prompt user to confirm or change project root.
 
-    ALWAYS prompts for input, even when cwd == detected.
-    Shows detected path as default - user can press Enter to accept.
+    Always prompts, even when cwd == detected, so the user can override.
 
     Args:
         cwd: Current working directory (unused, kept for API compatibility).
@@ -275,10 +268,8 @@ def prompt_project_root(cwd: Path, detected: Path) -> Path:
         Selected project root path.
     """
     if not is_interactive():
-        # Non-interactive: use detected
         return detected
 
-    # Always prompt - show detected as default
     response = input(f"Enter project root path [{detected}]: ").strip()
 
     if not response:
@@ -287,7 +278,6 @@ def prompt_project_root(cwd: Path, detected: Path) -> Path:
 
     selected = Path(response).expanduser().resolve()
 
-    # Validate the path exists
     if not selected.exists():
         print(f"Warning: Path does not exist: {selected}")
         print("Creating directory...")

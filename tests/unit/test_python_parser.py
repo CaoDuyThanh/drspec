@@ -1,7 +1,5 @@
 """Tests for the Python parser."""
 
-import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -292,33 +290,27 @@ def another_valid():
 class TestParseFile:
     """Tests for file parsing."""
 
-    def test_parse_file(self, parser):
+    def test_parse_file(self, parser, tmp_path):
         """Test parsing a file from disk."""
         code = '''
 def file_function():
     return "from file"
 '''
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
-        ) as f:
-            f.write(code)
-            f.flush()
-            temp_path = f.name
+        path = tmp_path / "source.py"
+        path.write_text(code)
+        temp_path = str(path)
 
-        try:
-            result = parser.parse_file(temp_path)
+        result = parser.parse_file(temp_path)
 
-            assert len(result.functions) == 1
-            assert result.file_path == temp_path
-            func = result.functions[0]
-            assert func.name == "file_function"
-        finally:
-            Path(temp_path).unlink()
+        assert len(result.functions) == 1
+        assert result.file_path == temp_path
+        func = result.functions[0]
+        assert func.name == "file_function"
 
-    def test_parse_file_not_found(self, parser):
+    def test_parse_file_not_found(self, parser, tmp_path):
         """Test parsing non-existent file raises error."""
         with pytest.raises(FileNotFoundError):
-            parser.parse_file("/nonexistent/path.py")
+            parser.parse_file(str(tmp_path / "missing.py"))
 
 
 class TestEdgeCases:
@@ -367,29 +359,18 @@ if True:
 
 
 class TestTreeSitterAPICompatibility:
-    """Regression tests for tree-sitter API compatibility.
-
-    These tests ensure the parser works across different tree-sitter versions.
-    See system-review.md for details on the tree-sitter 0.21.x compatibility issue.
-    """
+    """Regression tests for tree-sitter API compatibility across versions."""
 
     def test_parser_initialization(self):
-        """Test that parser initializes without error.
-
-        This is a regression test for the tree-sitter 0.21.x API change
-        where Language() and Parser.set_language()/Parser.language changed.
-        """
-        # This should not raise any exceptions
+        """Regression test for the tree-sitter 0.21.x Language()/
+        Parser.set_language() API change."""
         parser = PythonParser()
         assert parser is not None
         assert parser._language is not None
         assert parser._parser is not None
 
     def test_parser_can_parse_simple_code(self):
-        """Test that parser can parse after initialization.
-
-        Ensures Language is properly set on Parser.
-        """
+        """Ensures Language is properly set on Parser after initialization."""
         parser = PythonParser()
         result = parser.parse("def test(): pass")
 
@@ -406,3 +387,287 @@ class TestTreeSitterAPICompatibility:
         # Verify parser can actually parse (language is set correctly)
         result = parser.parse("def test(): pass")
         assert len(result.functions) == 1
+
+
+class TestCallExtraction:
+    """Tests for real call-site extraction."""
+
+    def test_bare_call(self, parser):
+        result = parser.parse("def foo():\n    bar()\n")
+        calls = result.functions[0].calls
+
+        assert len(calls) == 1
+        assert calls[0].receiver is None
+        assert calls[0].name == "bar"
+        assert calls[0].text == "bar()"
+
+    def test_attribute_call(self, parser):
+        result = parser.parse("def foo():\n    order.process()\n")
+        calls = result.functions[0].calls
+
+        assert len(calls) == 1
+        assert calls[0].receiver == "order"
+        assert calls[0].name == "process"
+
+    def test_super_call_tagged_with_sentinel(self, parser):
+        result = parser.parse("class C:\n    def __init__(self):\n        super().__init__()\n")
+        calls = result.functions[0].calls
+
+        super_calls = [c for c in calls if c.name == "__init__" and c.receiver == "super"]
+        assert len(super_calls) == 1
+
+    def test_nested_call_in_arguments_also_extracted(self):
+        parser = PythonParser()
+        result = parser.parse("def foo():\n    outer(inner())\n")
+        names = {c.name for c in result.functions[0].calls}
+
+        assert names == {"outer", "inner"}
+
+    def test_calls_in_nested_function_not_attributed_to_outer(self, parser):
+        result = parser.parse(
+            "def outer():\n    def inner():\n        inner_call()\n    outer_call()\n"
+        )
+        outer_func = next(f for f in result.functions if f.name == "outer")
+        inner_func = next(f for f in result.functions if f.name == "inner")
+
+        assert {c.name for c in outer_func.calls} == {"outer_call"}
+        assert {c.name for c in inner_func.calls} == {"inner_call"}
+
+    def test_call_inside_docstring_is_not_extracted(self, parser):
+        """A doctest example inside a docstring can never be mistaken for a
+        call — it's not a `call` AST node at all."""
+        code = (
+            'def foo():\n'
+            '    """Example:\n'
+            '        >>> foo()\n'
+            '    """\n'
+            '    return 1\n'
+        )
+        result = parser.parse(code)
+
+        assert result.functions[0].calls == []
+
+    def test_receiver_too_complex_is_skipped(self, parser):
+        """`get_obj().method()` — the receiver is itself a call result,
+        not `super()`, so it's too complex to represent — skipped, not
+        guessed as a bare call."""
+        result = parser.parse("def foo():\n    get_obj().method()\n")
+        names = {c.name for c in result.functions[0].calls}
+
+        # get_obj() itself is still extracted as its own bare call;
+        # "method" is not, since its receiver isn't representable.
+        assert names == {"get_obj"}
+
+
+class TestPropertyReadExtraction:
+    """Tests for non-call attribute-read extraction."""
+
+    def test_simple_attribute_read(self, parser):
+        result = parser.parse("def foo():\n    return obj.value\n")
+        reads = result.functions[0].property_reads
+
+        assert len(reads) == 1
+        assert reads[0].receiver == "obj"
+        assert reads[0].name == "value"
+        assert reads[0].text == "obj.value"
+
+    def test_method_call_is_not_a_property_read(self, parser):
+        """`obj.method()` is a call, already covered by `calls` — never
+        double-counted as a property read too."""
+        result = parser.parse("def foo():\n    return obj.method()\n")
+
+        assert result.functions[0].property_reads == []
+        assert len(result.functions[0].calls) == 1
+
+    def test_assignment_target_is_not_a_read(self, parser):
+        """`self.x = 5` is a write, not a read."""
+        result = parser.parse("class C:\n    def foo(self):\n        self.x = 5\n")
+        foo = next(f for f in result.functions if f.name == "foo")
+
+        assert foo.property_reads == []
+
+    def test_augmented_assignment_target_is_still_a_read(self, parser):
+        """`self.x += 1` genuinely invokes the getter first."""
+        result = parser.parse("class C:\n    def foo(self):\n        self.x += 1\n")
+        foo = next(f for f in result.functions if f.name == "foo")
+
+        assert len(foo.property_reads) == 1
+        assert foo.property_reads[0].name == "x"
+
+    def test_super_property_read_tagged_with_sentinel(self, parser):
+        result = parser.parse("class C:\n    def foo(self):\n        return super().value\n")
+        foo = next(f for f in result.functions if f.name == "foo")
+
+        assert len(foo.property_reads) == 1
+        assert foo.property_reads[0].receiver == "super"
+        assert foo.property_reads[0].name == "value"
+
+    def test_chained_attribute_only_innermost_identifier_receiver_extracted(self, parser):
+        """`other.helper.value` — the outer `.value` access has a
+        complex receiver (`other.helper`, itself an `attribute` node, not
+        a plain identifier), so it's skipped; the inner `other.helper`
+        still qualifies on its own."""
+        result = parser.parse("def foo():\n    return other.helper.value\n")
+        reads = result.functions[0].property_reads
+
+        assert len(reads) == 1
+        assert reads[0].receiver == "other"
+        assert reads[0].name == "helper"
+
+    def test_property_read_inside_call_arguments_still_extracted(self, parser):
+        result = parser.parse("def foo():\n    print(obj.value)\n")
+        reads = result.functions[0].property_reads
+
+        assert len(reads) == 1
+        assert reads[0].receiver == "obj"
+        assert reads[0].name == "value"
+
+    def test_property_read_nested_in_chained_call_receiver_still_extracted(self, parser):
+        """`obj.attr.method()` — the call's own callee reference
+        (`obj.attr.method`) is never itself a property read, but the
+        `obj.attr` nested inside it still is."""
+        result = parser.parse("def foo():\n    return obj.attr.method()\n")
+        reads = result.functions[0].property_reads
+
+        assert len(reads) == 1
+        assert reads[0].receiver == "obj"
+        assert reads[0].name == "attr"
+
+    def test_reads_in_nested_function_not_attributed_to_outer(self, parser):
+        result = parser.parse(
+            "def outer():\n    def inner():\n        return inner_obj.value\n    return outer_obj.value\n"
+        )
+        outer_func = next(f for f in result.functions if f.name == "outer")
+        inner_func = next(f for f in result.functions if f.name == "inner")
+
+        assert {r.receiver for r in outer_func.property_reads} == {"outer_obj"}
+        assert {r.receiver for r in inner_func.property_reads} == {"inner_obj"}
+
+    def test_receiver_too_complex_is_skipped(self, parser):
+        result = parser.parse("def foo():\n    return get_obj().value\n")
+
+        assert result.functions[0].property_reads == []
+
+
+class TestIsPropertyDetection:
+    """Tests for `@property` detection, including the getter/setter dedup fix."""
+
+    def test_property_decorator_sets_is_property(self, parser):
+        result = parser.parse("class C:\n    @property\n    def value(self):\n        return 1\n")
+
+        assert result.functions[0].is_property is True
+
+    def test_no_decorator_means_not_a_property(self, parser):
+        result = parser.parse("class C:\n    def value(self):\n        return 1\n")
+
+        assert result.functions[0].is_property is False
+
+    def test_other_decorator_does_not_count(self, parser):
+        result = parser.parse("class C:\n    @staticmethod\n    def value():\n        return 1\n")
+
+        assert result.functions[0].is_property is False
+
+    def test_getter_setter_pair_both_flagged_is_property(self, parser):
+        """A getter and its setter are two functions (their parameters differ); the
+        getter carries the flag and the setter, which is not `@property`-decorated, does not."""
+        code = (
+            "class C:\n"
+            "    @property\n"
+            "    def value(self):\n"
+            "        return self._value\n"
+            "\n"
+            "    @value.setter\n"
+            "    def value(self, v):\n"
+            "        self._value = v\n"
+        )
+        result = parser.parse(code)
+
+        assert [(f.qualified_name, f.parameter_tokens, f.is_property) for f in result.functions] == [
+            ("C.value", [], True),
+            ("C.value", ["v"], False),
+        ]
+
+
+class TestParamFactExtraction:
+    """Tests for first-param-name and declared-type extraction."""
+
+    def test_first_param_name_for_method(self, parser):
+        result = parser.parse("class C:\n    def process(self):\n        pass\n")
+        func = result.functions[0]
+
+        assert func.first_param_name == "self"
+
+    def test_first_param_name_whatever_its_actually_named(self, parser):
+        result = parser.parse("class C:\n    def process(order):\n        pass\n")
+        func = result.functions[0]
+
+        assert func.first_param_name == "order"
+
+    def test_declared_simple_type(self, parser):
+        result = parser.parse("def handle(order: Order):\n    pass\n")
+        func = result.functions[0]
+
+        assert func.declared_param_types == {"order": "Order"}
+
+    def test_declared_type_with_default_value(self, parser):
+        result = parser.parse("def handle(order: Order = None):\n    pass\n")
+        func = result.functions[0]
+
+        assert func.declared_param_types == {"order": "Order"}
+
+    def test_generic_type_not_captured(self, parser):
+        """`Optional[Order]` isn't a plain identifier type — never guess
+        a type we can't resolve to a simple class name."""
+        result = parser.parse("def handle(order: Optional[Order]):\n    pass\n")
+        func = result.functions[0]
+
+        assert func.declared_param_types == {}
+
+    def test_self_excluded_from_types(self, parser):
+        result = parser.parse("class C:\n    def process(self, order: Order):\n        pass\n")
+        func = result.functions[0]
+
+        assert "self" not in func.declared_param_types
+        assert func.declared_param_types == {"order": "Order"}
+
+
+class TestImportExtraction:
+    """Tests for real import-statement extraction."""
+
+    def test_bare_name_import(self, parser):
+        result = parser.parse("from utils import helper\n")
+
+        assert len(result.name_imports) == 1
+        assert result.name_imports[0].module_path == "utils"
+        assert result.name_imports[0].name == "helper"
+        assert result.name_imports[0].alias is None
+
+    def test_aliased_name_import(self, parser):
+        result = parser.parse("from utils import helper as h\n")
+
+        assert result.name_imports[0].alias == "h"
+
+    def test_multiple_names_one_statement(self, parser):
+        result = parser.parse("from utils import helper, other\n")
+
+        names = {i.name for i in result.name_imports}
+        assert names == {"helper", "other"}
+
+    def test_plain_module_import(self, parser):
+        result = parser.parse("import os\n")
+
+        assert len(result.module_imports) == 1
+        assert result.module_imports[0].module_path == "os"
+        assert result.module_imports[0].alias == "os"
+
+    def test_aliased_module_import(self, parser):
+        result = parser.parse("import os.path as osp\n")
+
+        assert result.module_imports[0].module_path == "os.path"
+        assert result.module_imports[0].alias == "osp"
+
+    def test_relative_import(self, parser):
+        result = parser.parse("from .utils import helper\n")
+
+        assert result.name_imports[0].module_path == "utils"
+        assert result.name_imports[0].name == "helper"

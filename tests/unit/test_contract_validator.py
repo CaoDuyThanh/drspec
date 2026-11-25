@@ -2,6 +2,7 @@
 
 import json
 
+import pytest
 
 from drspec.contracts import (
     Contract,
@@ -15,12 +16,18 @@ from drspec.contracts import (
     validate_contract_dict,
 )
 
+pytestmark = pytest.mark.unit  # JSON text in, validation result out
+
+
+def _failures(result) -> list:
+    """Where and why the validation failed, as `(location, message)` pairs."""
+    assert result.success is False and result.contract is None
+    assert result.error.code == "INVALID_SCHEMA" and result.error.message == "Contract validation failed"
+    return [(tuple(e["loc"]), e["msg"]) for e in result.error.details["errors"]]
+
 
 class TestValidateContract:
-    """Tests for validate_contract function."""
-
     def _make_valid_contract_json(self) -> str:
-        """Create valid contract JSON for testing."""
         return json.dumps({
             "function_signature": "def add(a: int, b: int) -> int",
             "intent_summary": "Adds two integers and returns the sum",
@@ -35,16 +42,15 @@ class TestValidateContract:
         })
 
     def test_valid_contract(self):
-        """Test validation of valid contract."""
         result = validate_contract(self._make_valid_contract_json())
 
-        assert result.success is True
-        assert result.contract is not None
-        assert result.error is None
+        assert result.success is True and result.error is None
         assert result.contract.function_signature == "def add(a: int, b: int) -> int"
+        assert result.contract.intent_summary == "Adds two integers and returns the sum"
+        assert result.contract.invariants == [Invariant(name="returns_integer", logic="Output is always an integer", criticality=Criticality.HIGH, on_fail=OnFail.ERROR)]
+        assert result.contract.io_examples == []
 
     def test_valid_contract_with_examples(self):
-        """Test validation of contract with IO examples."""
         contract_json = json.dumps({
             "function_signature": "def add(a: int, b: int) -> int",
             "intent_summary": "Adds two integers and returns the sum",
@@ -64,30 +70,25 @@ class TestValidateContract:
         result = validate_contract(contract_json)
 
         assert result.success is True
-        assert len(result.contract.io_examples) == 1
+        assert [(e.input, e.output) for e in result.contract.io_examples] == [({"a": 1, "b": 2}, 3)]
 
     def test_invalid_json(self):
-        """Test validation fails for invalid JSON."""
         result = validate_contract("not valid json {")
 
         assert result.success is False
         assert result.contract is None
-        assert result.error is not None
         assert result.error.code == "INVALID_JSON"
-        assert "position" in result.error.details
+        assert result.error.message == "Invalid JSON at position 0: Expecting value"
+        assert result.error.details == {"position": 0, "line": 1, "column": 1}
 
     def test_invalid_json_position(self):
-        """Test invalid JSON error includes position info."""
         result = validate_contract('{"key": value}')  # missing quotes around value
 
         assert result.success is False
         assert result.error.code == "INVALID_JSON"
-        assert "position" in result.error.details
-        assert "line" in result.error.details
-        assert "column" in result.error.details
+        assert result.error.details == {"position": 8, "line": 1, "column": 9}  # `value` starts at the 9th character; positions are 0-based, columns 1-based
 
     def test_missing_required_field(self):
-        """Test validation fails for missing required field."""
         contract_json = json.dumps({
             "intent_summary": "Does something",
             "invariants": [
@@ -102,16 +103,9 @@ class TestValidateContract:
 
         result = validate_contract(contract_json)
 
-        assert result.success is False
-        assert result.error.code == "INVALID_SCHEMA"
-        assert "errors" in result.error.details
-
-        # Check that function_signature is mentioned in errors
-        errors = result.error.details["errors"]
-        assert any("function_signature" in str(e.get("loc", [])) for e in errors)
+        assert _failures(result) == [(("function_signature",), "Field required")]
 
     def test_empty_invariants(self):
-        """Test validation fails for empty invariants list."""
         contract_json = json.dumps({
             "function_signature": "def foo()",
             "intent_summary": "Does something useful here",
@@ -120,11 +114,9 @@ class TestValidateContract:
 
         result = validate_contract(contract_json)
 
-        assert result.success is False
-        assert result.error.code == "INVALID_SCHEMA"
+        assert _failures(result) == [(("invariants",), "List should have at least 1 item after validation, not 0")]
 
     def test_invalid_criticality(self):
-        """Test validation fails for invalid criticality value."""
         contract_json = json.dumps({
             "function_signature": "def foo()",
             "intent_summary": "Does something useful here",
@@ -140,15 +132,9 @@ class TestValidateContract:
 
         result = validate_contract(contract_json)
 
-        assert result.success is False
-        assert result.error.code == "INVALID_SCHEMA"
-
-        # Check error mentions criticality
-        errors = result.error.details["errors"]
-        assert any("criticality" in str(e.get("loc", [])) for e in errors)
+        assert _failures(result) == [(("invariants", 0, "criticality"), "Input should be 'HIGH', 'MEDIUM' or 'LOW'")]
 
     def test_invalid_on_fail(self):
-        """Test validation fails for invalid on_fail value."""
         contract_json = json.dumps({
             "function_signature": "def foo()",
             "intent_summary": "Does something useful here",
@@ -164,11 +150,9 @@ class TestValidateContract:
 
         result = validate_contract(contract_json)
 
-        assert result.success is False
-        assert result.error.code == "INVALID_SCHEMA"
+        assert _failures(result) == [(("invariants", 0, "on_fail"), "Input should be 'error' or 'warn'")]
 
     def test_intent_summary_too_short(self):
-        """Test validation fails for too short intent summary."""
         contract_json = json.dumps({
             "function_signature": "def foo()",
             "intent_summary": "Short",
@@ -184,18 +168,16 @@ class TestValidateContract:
 
         result = validate_contract(contract_json)
 
-        assert result.success is False
-        assert result.error.code == "INVALID_SCHEMA"
+        assert _failures(result) == [(("intent_summary",), "Value error, Intent summary must be at least 10 characters")]
 
     def test_invariant_logic_too_short(self):
-        """Test validation fails for too short invariant logic."""
         contract_json = json.dumps({
             "function_signature": "def foo()",
             "intent_summary": "Does something useful here",
             "invariants": [
                 {
                     "name": "test",
-                    "logic": "abc",  # Too short
+                    "logic": "abc",  # too short
                     "criticality": "HIGH",
                     "on_fail": "error",
                 }
@@ -204,11 +186,9 @@ class TestValidateContract:
 
         result = validate_contract(contract_json)
 
-        assert result.success is False
-        assert result.error.code == "INVALID_SCHEMA"
+        assert _failures(result) == [(("invariants", 0, "logic"), "Value error, Invariant logic must be at least 5 characters")]
 
     def test_multiple_invariants(self):
-        """Test validation with multiple invariants."""
         contract_json = json.dumps({
             "function_signature": "def process(data: list) -> dict",
             "intent_summary": "Processes data and returns results",
@@ -237,14 +217,15 @@ class TestValidateContract:
         result = validate_contract(contract_json)
 
         assert result.success is True
-        assert len(result.contract.invariants) == 3
+        assert [(i.name, i.criticality, i.on_fail) for i in result.contract.invariants] == [
+            ("input_not_empty", Criticality.HIGH, OnFail.ERROR),
+            ("output_has_status", Criticality.MEDIUM, OnFail.WARN),
+            ("no_data_loss", Criticality.HIGH, OnFail.ERROR),
+        ]  # in the order written
 
 
 class TestValidateContractDict:
-    """Tests for validate_contract_dict function."""
-
     def test_valid_dict(self):
-        """Test validation of valid dictionary."""
         data = {
             "function_signature": "def foo() -> str",
             "intent_summary": "Returns a greeting message",
@@ -260,27 +241,23 @@ class TestValidateContractDict:
 
         result = validate_contract_dict(data)
 
-        assert result.success is True
-        assert result.contract is not None
+        assert result.success is True and result.error is None
+        assert result.contract.function_signature == "def foo() -> str"
+        assert [i.name for i in result.contract.invariants] == ["returns_string"]
 
     def test_invalid_dict(self):
-        """Test validation fails for invalid dictionary."""
         data = {
             "function_signature": "def foo()",
-            # Missing intent_summary and invariants
+            # missing intent_summary and invariants
         }
 
         result = validate_contract_dict(data)
 
-        assert result.success is False
-        assert result.error.code == "INVALID_SCHEMA"
+        assert _failures(result) == [(("intent_summary",), "Field required"), (("invariants",), "Field required")]  # every missing field, not only the first
 
 
 class TestValidationResult:
-    """Tests for ValidationResult class."""
-
     def test_success_result_to_dict(self):
-        """Test successful result converts to dict."""
         contract = Contract(
             function_signature="def foo() -> int",
             intent_summary="Returns a number greater than zero",
@@ -297,12 +274,18 @@ class TestValidationResult:
 
         data = result.to_dict()
 
-        assert data["success"] is True
-        assert data["contract"] is not None
-        assert data["error"] is None
+        assert data == {
+            "success": True,
+            "contract": {
+                "function_signature": "def foo() -> int",
+                "intent_summary": "Returns a number greater than zero",
+                "invariants": [{"name": "positive", "logic": "Output is always positive", "criticality": Criticality.HIGH, "on_fail": OnFail.ERROR}],
+                "io_examples": [],
+            },
+            "error": None,
+        }
 
     def test_error_result_to_dict(self):
-        """Test error result converts to dict."""
         error = ValidationError(
             code="INVALID_SCHEMA",
             message="Validation failed",
@@ -312,17 +295,15 @@ class TestValidationResult:
 
         data = result.to_dict()
 
-        assert data["success"] is False
-        assert data["contract"] is None
-        assert data["error"] is not None
-        assert data["error"]["code"] == "INVALID_SCHEMA"
+        assert data == {
+            "success": False,
+            "contract": None,
+            "error": {"code": "INVALID_SCHEMA", "message": "Validation failed", "details": {"errors": [{"loc": ["name"], "msg": "Required"}]}},
+        }
 
 
 class TestFormatValidationErrors:
-    """Tests for format_validation_errors function."""
-
     def test_format_success(self):
-        """Test formatting successful result."""
         result = ValidationResult(success=True)
 
         output = format_validation_errors(result)
@@ -330,7 +311,6 @@ class TestFormatValidationErrors:
         assert output == "Validation successful"
 
     def test_format_schema_error(self):
-        """Test formatting schema validation error."""
         error = ValidationError(
             code="INVALID_SCHEMA",
             message="Contract validation failed",
@@ -344,12 +324,9 @@ class TestFormatValidationErrors:
 
         output = format_validation_errors(result)
 
-        assert "INVALID_SCHEMA" in output
-        assert "invariants" in output
-        assert "Field required" in output
+        assert output == "Error: Contract validation failed (INVALID_SCHEMA)\nDetails:\n  - invariants -> 0 -> name: Field required"
 
     def test_format_json_error(self):
-        """Test formatting JSON parse error."""
         error = ValidationError(
             code="INVALID_JSON",
             message="Invalid JSON at position 10: Expecting value",
@@ -359,16 +336,14 @@ class TestFormatValidationErrors:
 
         output = format_validation_errors(result)
 
-        assert "INVALID_JSON" in output
-        assert "line 1" in output
-        assert "column 11" in output
+        assert output == "Error: Invalid JSON at position 10: Expecting value (INVALID_JSON)\n  At line 1, column 11 (position 10)"
 
 
 class TestArchitectureExample:
-    """Test the example from architecture documentation."""
+    """A realistic, non-trivial contract (not a minimal synthetic fixture)
+    exercising validation end to end."""
 
     def test_architecture_example_contract(self):
-        """Test the reconcile_transactions example from docs."""
         contract_json = '''
         {
             "function_signature": "def reconcile_transactions(pending: List[Transaction], posted: List[Transaction]) -> ReconciliationResult",
@@ -399,8 +374,9 @@ class TestArchitectureExample:
         result = validate_contract(contract_json)
 
         assert result.success is True
-        assert "reconcile_transactions" in result.contract.function_signature
-        assert len(result.contract.invariants) == 2
-        assert result.contract.invariants[0].name == "no_duplicate_transaction_ids"
-        assert result.contract.invariants[0].criticality == Criticality.HIGH
-        assert len(result.contract.io_examples) == 1
+        assert result.contract.function_signature.startswith("def reconcile_transactions(pending: List[Transaction]")
+        assert [(i.name, i.criticality) for i in result.contract.invariants] == [
+            ("no_duplicate_transaction_ids", Criticality.HIGH),
+            ("balance_preserved", Criticality.HIGH),
+        ]
+        assert [e.input for e in result.contract.io_examples] == [{"pending": [{"id": 1, "amount": 100}], "posted": []}]

@@ -26,8 +26,7 @@
 
 **Key commands for Proposer:**
 - `drspec source get <function_id>` - Get function source code with @invariant hints
-- `drspec queue next` - Get next function to analyze
-- `drspec queue peek --limit 5` - Preview upcoming queue items
+- `drspec search --status PENDING --limit 5` - Find functions that still need a contract (`--status STALE` for ones whose contract is out of date)
 - `drspec contract get <function_id>` - Check if contract already exists
 
 ## Analysis Approach

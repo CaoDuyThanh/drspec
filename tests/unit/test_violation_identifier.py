@@ -1,12 +1,3 @@
-"""Tests for invariant violation identifier (Story 5-3).
-
-These tests verify the violation identification API:
-- ViolationDetail and ViolationReport models
-- identify_violations: Analyze verification results
-- Criticality-based sorting
-- Suggestion generation
-"""
-
 from __future__ import annotations
 
 
@@ -29,10 +20,7 @@ from drspec.debugging import (
 
 
 class TestViolationDetail:
-    """Tests for ViolationDetail dataclass."""
-
     def test_create_violation_detail(self):
-        """Should create a violation detail."""
         detail = ViolationDetail(
             invariant_name="no_duplicates",
             invariant_logic="All IDs must be unique",
@@ -50,7 +38,6 @@ class TestViolationDetail:
         assert detail.line_reference == 89
 
     def test_to_dict(self):
-        """Should convert to dictionary."""
         detail = ViolationDetail(
             invariant_name="positive",
             invariant_logic="Output > 0",
@@ -71,10 +58,7 @@ class TestViolationDetail:
 
 
 class TestViolationReport:
-    """Tests for ViolationReport dataclass."""
-
     def test_create_empty_report(self):
-        """Should create a report with no violations."""
         report = ViolationReport(
             function_id="test::func",
             total_invariants=3,
@@ -88,7 +72,6 @@ class TestViolationReport:
         assert not report.has_violations
 
     def test_has_violations_property(self):
-        """Should detect when violations exist."""
         report = ViolationReport(
             function_id="test::func",
             total_invariants=3,
@@ -106,7 +89,6 @@ class TestViolationReport:
         assert report.has_violations is True
 
     def test_has_critical_violations_property(self):
-        """Should detect HIGH criticality violations."""
         report_with_high = ViolationReport(
             function_id="test::func",
             total_invariants=3,
@@ -139,7 +121,6 @@ class TestViolationReport:
         assert report_without_high.has_critical_violations is False
 
     def test_to_dict(self):
-        """Should convert to dictionary with nested violations."""
         report = ViolationReport(
             function_id="test::func",
             total_invariants=2,
@@ -163,15 +144,12 @@ class TestViolationReport:
 
 
 # =============================================================================
-# identify_violations Tests (AC: 1, 2, 3, 4, 5)
+# identify_violations Tests
 # =============================================================================
 
 
 class TestIdentifyViolations:
-    """Tests for identify_violations function."""
-
     def test_identifies_single_violation(self):
-        """Should identify a single violation (AC: 1)."""
         result = RuntimeVerificationResult(
             function_id="src/test.py::func",
             passed=False,
@@ -191,7 +169,6 @@ class TestIdentifyViolations:
         assert report.violations[0].invariant_name == "positive_output"
 
     def test_identifies_multiple_violations(self):
-        """Should identify all violations (AC: 5)."""
         result = RuntimeVerificationResult(
             function_id="src/test.py::func",
             passed=False,
@@ -211,7 +188,6 @@ class TestIdentifyViolations:
         assert len(report.violations) == 3
 
     def test_includes_criticality(self):
-        """Should include criticality in violations (AC: 2)."""
         result = RuntimeVerificationResult(
             function_id="test::func",
             passed=False,
@@ -225,7 +201,6 @@ class TestIdentifyViolations:
         assert report.violations[0].criticality == "HIGH"
 
     def test_includes_invariant_logic(self):
-        """Should include invariant logic (AC: 2)."""
         result = RuntimeVerificationResult(
             function_id="test::func",
             passed=False,
@@ -248,7 +223,6 @@ class TestIdentifyViolations:
         assert "greater than zero" in report.violations[0].invariant_logic
 
     def test_generates_expected_actual(self):
-        """Should generate expected/actual (AC: 3, 4)."""
         result = RuntimeVerificationResult(
             function_id="test::func",
             passed=False,
@@ -270,7 +244,6 @@ class TestIdentifyViolations:
         assert report.violations[0].actual is not None
 
     def test_returns_empty_violations_when_all_pass(self):
-        """Should return empty violations list when all pass."""
         result = RuntimeVerificationResult(
             function_id="test::func",
             passed=True,
@@ -288,15 +261,12 @@ class TestIdentifyViolations:
 
 
 # =============================================================================
-# Criticality Ordering Tests (AC: 6)
+# Criticality Ordering Tests
 # =============================================================================
 
 
 class TestCriticalityOrdering:
-    """Tests for criticality-based sorting."""
-
     def test_orders_high_first(self):
-        """Should order HIGH criticality first (AC: 6)."""
         result = RuntimeVerificationResult(
             function_id="test::func",
             passed=False,
@@ -314,7 +284,6 @@ class TestCriticalityOrdering:
         assert report.violations[2].criticality == "LOW"
 
     def test_most_critical_is_high(self):
-        """Should set most_critical to HIGH violation."""
         result = RuntimeVerificationResult(
             function_id="test::func",
             passed=False,
@@ -331,7 +300,6 @@ class TestCriticalityOrdering:
         assert report.most_critical.criticality == "HIGH"
 
     def test_criticality_order_constant(self):
-        """Should have correct criticality ordering values."""
         assert CRITICALITY_ORDER["HIGH"] < CRITICALITY_ORDER["MEDIUM"]
         assert CRITICALITY_ORDER["MEDIUM"] < CRITICALITY_ORDER["LOW"]
 
@@ -342,10 +310,7 @@ class TestCriticalityOrdering:
 
 
 class TestSuggestionGeneration:
-    """Tests for debugging suggestion generation."""
-
     def test_duplicate_suggestion(self):
-        """Should suggest uniqueness validation for duplicates."""
         result = RuntimeVerificationResult(
             function_id="test::func",
             passed=False,
@@ -364,7 +329,6 @@ class TestSuggestionGeneration:
         assert "unique" in report.violations[0].suggestion.lower() or "dedup" in report.violations[0].suggestion.lower()
 
     def test_null_suggestion(self):
-        """Should suggest null checks for null violations."""
         result = RuntimeVerificationResult(
             function_id="test::func",
             passed=False,
@@ -383,7 +347,6 @@ class TestSuggestionGeneration:
         assert "null" in report.violations[0].suggestion.lower() or "none" in report.violations[0].suggestion.lower()
 
     def test_negative_suggestion(self):
-        """Should suggest bounds validation for negative values."""
         result = RuntimeVerificationResult(
             function_id="test::func",
             passed=False,
@@ -408,10 +371,7 @@ class TestSuggestionGeneration:
 
 
 class TestSummaryGeneration:
-    """Tests for summary generation."""
-
     def test_no_violations_summary(self):
-        """Should generate correct summary when no violations."""
         result = RuntimeVerificationResult(
             function_id="src/test.py::func",
             passed=True,
@@ -426,7 +386,6 @@ class TestSummaryGeneration:
         assert "1" in report.summary
 
     def test_single_violation_summary(self):
-        """Should generate correct summary for single violation."""
         result = RuntimeVerificationResult(
             function_id="test::func",
             passed=False,
@@ -441,7 +400,6 @@ class TestSummaryGeneration:
         assert "positive" in report.summary
 
     def test_multiple_violations_summary(self):
-        """Should generate correct summary for multiple violations."""
         result = RuntimeVerificationResult(
             function_id="test::func",
             passed=False,
@@ -464,10 +422,7 @@ class TestSummaryGeneration:
 
 
 class TestUtilityFunctions:
-    """Tests for utility functions."""
-
     def test_get_violation_by_name(self):
-        """Should find violation by name."""
         report = ViolationReport(
             function_id="test::func",
             total_invariants=2,
@@ -490,7 +445,6 @@ class TestUtilityFunctions:
         assert not_found is None
 
     def test_get_high_criticality_violations(self):
-        """Should filter to HIGH criticality only."""
         report = ViolationReport(
             function_id="test::func",
             total_invariants=3,
@@ -509,7 +463,6 @@ class TestUtilityFunctions:
         assert all(v.criticality == "HIGH" for v in high)
 
     def test_format_violation_report(self):
-        """Should format report as text."""
         report = ViolationReport(
             function_id="src/test.py::func",
             total_invariants=2,

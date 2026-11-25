@@ -10,10 +10,11 @@ from drspec.contracts import (
     Invariant,
     IOExample,
     OnFail,
-    generate_verification_script,
     compute_script_hash,
+    generate_verification_script,
 )
 
+pytestmark = pytest.mark.unit  # pure functions, and the generated text run with `exec`: nothing else
 
 # =============================================================================
 # Fixtures
@@ -22,7 +23,6 @@ from drspec.contracts import (
 
 @pytest.fixture
 def simple_contract() -> Contract:
-    """A simple contract with one invariant."""
     return Contract(
         function_signature="def double(x: int) -> int",
         intent_summary="Doubles the input value",
@@ -39,7 +39,6 @@ def simple_contract() -> Contract:
 
 @pytest.fixture
 def multi_invariant_contract() -> Contract:
-    """A contract with multiple invariants."""
     return Contract(
         function_signature="def process_items(items: list) -> list",
         intent_summary="Processes a list of items and returns filtered results",
@@ -68,7 +67,6 @@ def multi_invariant_contract() -> Contract:
 
 @pytest.fixture
 def contract_with_examples() -> Contract:
-    """A contract with IO examples."""
     return Contract(
         function_signature="def add(a: int, b: int) -> int",
         intent_summary="Adds two numbers and returns the sum",
@@ -96,14 +94,13 @@ class TestBasicGeneration:
     """Tests for basic script generation."""
 
     def test_generates_valid_python(self, simple_contract: Contract) -> None:
-        """Generated script should be valid Python."""
         script = generate_verification_script(simple_contract, "test.py::double")
 
-        # Should be able to compile without errors
-        compile(script, "<string>", "exec")
+        namespace: dict = {}
+        exec(compile(script, "<string>", "exec"), namespace)  # it compiles and runs to the end of its definitions
+        assert callable(namespace["verify"])  # and defines the function the executor calls
 
     def test_contains_verify_function(self, simple_contract: Contract) -> None:
-        """Script should contain a verify function."""
         script = generate_verification_script(simple_contract, "test.py::double")
 
         assert "def verify(" in script
@@ -111,19 +108,16 @@ class TestBasicGeneration:
         assert "output_data" in script
 
     def test_contains_function_id_in_docstring(self, simple_contract: Contract) -> None:
-        """Script should document the function ID."""
         script = generate_verification_script(simple_contract, "test.py::double")
 
         assert "test.py::double" in script
 
     def test_contains_intent_summary(self, simple_contract: Contract) -> None:
-        """Script should include the contract intent."""
         script = generate_verification_script(simple_contract, "test.py::double")
 
         assert "Doubles the input value" in script
 
     def test_contains_check_functions(self, simple_contract: Contract) -> None:
-        """Script should have check functions for each invariant."""
         script = generate_verification_script(simple_contract, "test.py::double")
 
         assert "_check_invariant_1" in script
@@ -131,7 +125,6 @@ class TestBasicGeneration:
     def test_multiple_invariants_generate_multiple_checks(
         self, multi_invariant_contract: Contract
     ) -> None:
-        """Each invariant should get its own check function."""
         script = generate_verification_script(
             multi_invariant_contract, "test.py::process_items"
         )
@@ -150,23 +143,20 @@ class TestScriptExecution:
     """Tests for actually executing generated scripts."""
 
     def test_verify_returns_tuple(self, simple_contract: Contract) -> None:
-        """verify() should return (bool, str) tuple."""
         script = generate_verification_script(simple_contract, "test.py::double")
 
-        # Execute the script to get the verify function
         namespace: dict = {}
         exec(script, namespace)
         verify = namespace["verify"]
 
         result = verify({"x": 5}, 10)
-        assert isinstance(result, tuple)
-        assert len(result) == 2
-        assert isinstance(result[0], bool)
-        assert isinstance(result[1], str)
+        assert isinstance(result, dict)
+        assert isinstance(result["passed"], bool)
+        assert isinstance(result["results"], list)
+        assert result["status"] == "unverified"
 
     def test_verify_passes_for_valid_data(self) -> None:
-        """verify() should pass for valid input/output with translatable invariant."""
-        # Use an invariant that can be translated
+        # non_empty is translatable to a real check, unlike some other invariant logic
         contract = Contract(
             function_signature="def get_items() -> list",
             intent_summary="Gets a list of items",
@@ -185,22 +175,21 @@ class TestScriptExecution:
         exec(script, namespace)
         verify = namespace["verify"]
 
-        # Non-empty list should pass
-        passed, message = verify({}, [1, 2, 3])
+        result = verify({}, [1, 2, 3])
+        passed, message = result["passed"], result["message"]
         assert passed is True
         assert "passed" in message.lower()
 
     def test_verify_handles_exception(self, simple_contract: Contract) -> None:
-        """verify() should catch exceptions and return failure."""
         script = generate_verification_script(simple_contract, "test.py::double")
 
         namespace: dict = {}
         exec(script, namespace)
         verify = namespace["verify"]
 
-        # Pass None which might cause issues in some checks
-        passed, message = verify(None, None)
-        # Should handle gracefully (pass or fail, but not crash)
+        # None args may trip up checks that assume a real value; must not crash
+        result = verify(None, None)
+        passed, message = result["passed"], result["message"]
         assert isinstance(passed, bool)
         assert isinstance(message, str)
 
@@ -214,7 +203,6 @@ class TestInvariantTranslation:
     """Tests for invariant logic translation."""
 
     def test_translates_non_empty_output(self) -> None:
-        """Should translate 'not empty' invariants."""
         contract = Contract(
             function_signature="def get_items() -> list",
             intent_summary="Gets all items",
@@ -229,24 +217,22 @@ class TestInvariantTranslation:
         )
         script = generate_verification_script(contract, "test.py::get_items")
 
-        # Should contain an actual check, not just "return True"
+        # a real check, not just a "return True" stub
         assert "len(output_data)" in script or "is not None" in script
 
-        # Verify it works
         namespace: dict = {}
         exec(script, namespace)
         verify = namespace["verify"]
 
-        # Non-empty list should pass
-        passed, _ = verify({}, [1, 2, 3])
+        result = verify({}, [1, 2, 3])
+        passed, _ = result["passed"], result["message"]
         assert passed is True
 
-        # Empty list should fail
-        passed, _ = verify({}, [])
+        result = verify({}, [])
+        passed, _ = result["passed"], result["message"]
         assert passed is False
 
     def test_translates_positive_values(self) -> None:
-        """Should translate 'positive' invariants."""
         contract = Contract(
             function_signature="def get_value() -> int",
             intent_summary="Gets a positive value",
@@ -265,20 +251,20 @@ class TestInvariantTranslation:
         exec(script, namespace)
         verify = namespace["verify"]
 
-        # Positive number should pass
-        passed, _ = verify({}, 5)
+        result = verify({}, 5)
+        passed, _ = result["passed"], result["message"]
         assert passed is True
 
-        # Zero should fail (not positive)
-        passed, _ = verify({}, 0)
+        # zero is not positive
+        result = verify({}, 0)
+        passed, _ = result["passed"], result["message"]
         assert passed is False
 
-        # Negative should fail
-        passed, _ = verify({}, -1)
+        result = verify({}, -1)
+        passed, _ = result["passed"], result["message"]
         assert passed is False
 
     def test_translates_non_negative_values(self) -> None:
-        """Should translate 'non-negative' invariants."""
         contract = Contract(
             function_signature="def get_count() -> int",
             intent_summary="Gets a count (non-negative)",
@@ -297,20 +283,20 @@ class TestInvariantTranslation:
         exec(script, namespace)
         verify = namespace["verify"]
 
-        # Positive should pass
-        passed, _ = verify({}, 5)
+        result = verify({}, 5)
+        passed, _ = result["passed"], result["message"]
         assert passed is True
 
-        # Zero should pass (non-negative)
-        passed, _ = verify({}, 0)
+        # zero counts as non-negative
+        result = verify({}, 0)
+        passed, _ = result["passed"], result["message"]
         assert passed is True
 
-        # Negative should fail
-        passed, _ = verify({}, -1)
+        result = verify({}, -1)
+        passed, _ = result["passed"], result["message"]
         assert passed is False
 
     def test_translates_not_none(self) -> None:
-        """Should translate 'not None' invariants."""
         contract = Contract(
             function_signature="def get_result() -> Any",
             intent_summary="Gets some result",
@@ -329,19 +315,19 @@ class TestInvariantTranslation:
         exec(script, namespace)
         verify = namespace["verify"]
 
-        # Non-None should pass
-        passed, _ = verify({}, "something")
+        result = verify({}, "something")
+        passed, _ = result["passed"], result["message"]
         assert passed is True
 
-        passed, _ = verify({}, 0)  # 0 is not None
+        result = verify({}, 0)
+        passed, _ = result["passed"], result["message"]  # 0 is not None
         assert passed is True
 
-        # None should fail
-        passed, _ = verify({}, None)
+        result = verify({}, None)
+        passed, _ = result["passed"], result["message"]
         assert passed is False
 
     def test_translates_type_checks(self) -> None:
-        """Should translate type check invariants."""
         contract = Contract(
             function_signature="def get_items() -> list",
             intent_summary="Gets items as a list",
@@ -360,12 +346,12 @@ class TestInvariantTranslation:
         exec(script, namespace)
         verify = namespace["verify"]
 
-        # List should pass
-        passed, _ = verify({}, [1, 2, 3])
+        result = verify({}, [1, 2, 3])
+        passed, _ = result["passed"], result["message"]
         assert passed is True
 
-        # Dict should fail
-        passed, _ = verify({}, {"a": 1})
+        result = verify({}, {"a": 1})
+        passed, _ = result["passed"], result["message"]
         assert passed is False
 
 
@@ -378,14 +364,12 @@ class TestDeterminism:
     """Tests for script generation determinism."""
 
     def test_same_contract_same_script(self, simple_contract: Contract) -> None:
-        """Same contract should always generate same script."""
         script1 = generate_verification_script(simple_contract, "test.py::double")
         script2 = generate_verification_script(simple_contract, "test.py::double")
 
         assert script1 == script2
 
     def test_same_contract_same_hash(self, simple_contract: Contract) -> None:
-        """Same script should have same hash."""
         script1 = generate_verification_script(simple_contract, "test.py::double")
         script2 = generate_verification_script(simple_contract, "test.py::double")
 
@@ -394,7 +378,6 @@ class TestDeterminism:
     def test_different_contracts_different_scripts(
         self, simple_contract: Contract, multi_invariant_contract: Contract
     ) -> None:
-        """Different contracts should generate different scripts."""
         script1 = generate_verification_script(simple_contract, "test.py::func1")
         script2 = generate_verification_script(
             multi_invariant_contract, "test.py::func2"
@@ -412,7 +395,6 @@ class TestErrorMessages:
     """Tests for verification failure messages."""
 
     def test_failure_message_contains_invariant_name(self) -> None:
-        """Failure message should identify which invariant failed."""
         contract = Contract(
             function_signature="def get_items() -> list",
             intent_summary="Gets items",
@@ -431,18 +413,22 @@ class TestErrorMessages:
         exec(script, namespace)
         verify = namespace["verify"]
 
-        passed, message = verify({}, [])
+        result = verify({}, [])
+        passed, _message = result["passed"], result["message"]
         assert passed is False
-        assert "non_empty_output" in message
+        assert result["results"][0]["name"] == "non_empty_output"
 
     def test_success_message_shows_count(self, multi_invariant_contract: Contract) -> None:
-        """Success message should show how many invariants passed."""
         script = generate_verification_script(
             multi_invariant_contract, "test.py::process_items"
         )
 
-        # The invariants may be optimistically passed for untranslatable logic
-        assert "3 invariant" in script  # Should reference 3 invariants
+        # the untranslatable no_duplicates invariant must be explicitly skipped, not silently dropped
+        namespace = {}
+        exec(script, namespace)
+        result = namespace["verify"]({}, [1, 2])
+        assert len(result["results"]) == 3
+        assert result["invariants_skipped"] == 1
 
 
 # =============================================================================
@@ -454,7 +440,6 @@ class TestEdgeCases:
     """Tests for edge cases in script generation."""
 
     def test_invariant_with_special_chars_in_logic(self) -> None:
-        """Should handle special characters in logic description."""
         contract = Contract(
             function_signature="def check() -> bool",
             intent_summary="Checks something",
@@ -469,11 +454,11 @@ class TestEdgeCases:
         )
         script = generate_verification_script(contract, "test.py::check")
 
-        # Should compile without errors
-        compile(script, "<string>", "exec")
+        namespace: dict = {}
+        exec(compile(script, "<string>", "exec"), namespace)  # it compiles and runs to the end of its definitions
+        assert callable(namespace["verify"])  # and defines the function the executor calls
 
     def test_very_long_invariant_logic(self) -> None:
-        """Should handle very long logic descriptions."""
         long_logic = "This is a very long logic description. " * 20
         contract = Contract(
             function_signature="def check() -> bool",
@@ -489,11 +474,11 @@ class TestEdgeCases:
         )
         script = generate_verification_script(contract, "test.py::check")
 
-        # Should compile without errors
-        compile(script, "<string>", "exec")
+        namespace: dict = {}
+        exec(compile(script, "<string>", "exec"), namespace)  # it compiles and runs to the end of its definitions
+        assert callable(namespace["verify"])  # and defines the function the executor calls
 
     def test_many_invariants(self) -> None:
-        """Should handle many invariants."""
         invariants = [
             Invariant(
                 name=f"invariant_{i}",
@@ -510,9 +495,7 @@ class TestEdgeCases:
         )
         script = generate_verification_script(contract, "test.py::complex_func")
 
-        # Should compile
         compile(script, "<string>", "exec")
 
-        # Should have all check functions
         for i in range(1, 21):
             assert f"_check_invariant_{i}" in script

@@ -13,42 +13,38 @@ from drspec.contracts import (
     OnFail,
 )
 
+pytestmark = pytest.mark.unit  # pydantic models, no I/O
+
+
+def _errors(exc_info) -> list:
+    """What pydantic says went wrong: `(location, message)` for each error."""
+    return [(error["loc"], error["msg"]) for error in exc_info.value.errors()]
+
 
 class TestCriticalityEnum:
-    """Tests for Criticality enum."""
-
     def test_criticality_values(self):
-        """Test criticality has expected values."""
         assert Criticality.HIGH == "HIGH"
         assert Criticality.MEDIUM == "MEDIUM"
         assert Criticality.LOW == "LOW"
 
     def test_criticality_is_string_enum(self):
-        """Test criticality can be used as string."""
-        # As a str subclass, comparing to string works
+        # a str subclass, so comparing to a plain string works
         assert Criticality.HIGH == "HIGH"
         assert Criticality.HIGH.value == "HIGH"
 
 
 class TestOnFailEnum:
-    """Tests for OnFail enum."""
-
     def test_on_fail_values(self):
-        """Test on_fail has expected values."""
         assert OnFail.ERROR == "error"
         assert OnFail.WARN == "warn"
 
     def test_on_fail_is_string_enum(self):
-        """Test on_fail can be used as string."""
         assert OnFail.ERROR.value == "error"
         assert OnFail.WARN.value == "warn"
 
 
 class TestInvariant:
-    """Tests for Invariant model."""
-
     def test_valid_invariant(self):
-        """Test creating a valid invariant."""
         inv = Invariant(
             name="non_negative_output",
             logic="Output value is always >= 0",
@@ -61,7 +57,6 @@ class TestInvariant:
         assert inv.on_fail == OnFail.ERROR
 
     def test_invariant_with_string_enums(self):
-        """Test creating invariant with string values for enums."""
         inv = Invariant(
             name="test",
             logic="Test logic here",
@@ -72,17 +67,15 @@ class TestInvariant:
         assert inv.on_fail == OnFail.WARN
 
     def test_invariant_name_required(self):
-        """Test invariant name is required."""
         with pytest.raises(ValidationError) as exc_info:
             Invariant(
                 logic="Some logic",
                 criticality=Criticality.HIGH,
                 on_fail=OnFail.ERROR,
             )
-        assert "name" in str(exc_info.value)
+        assert _errors(exc_info) == [(("name",), "Field required")]
 
     def test_invariant_name_not_empty(self):
-        """Test invariant name cannot be empty."""
         with pytest.raises(ValidationError) as exc_info:
             Invariant(
                 name="",
@@ -90,10 +83,10 @@ class TestInvariant:
                 criticality=Criticality.HIGH,
                 on_fail=OnFail.ERROR,
             )
-        assert "name" in str(exc_info.value).lower()
+        assert _errors(exc_info) == [(("name",), "String should have at least 1 character")]
+
 
     def test_invariant_name_whitespace_stripped(self):
-        """Test invariant name has whitespace stripped."""
         inv = Invariant(
             name="  test_name  ",
             logic="Some logic",
@@ -103,17 +96,16 @@ class TestInvariant:
         assert inv.name == "test_name"
 
     def test_invariant_logic_required(self):
-        """Test invariant logic is required."""
         with pytest.raises(ValidationError) as exc_info:
             Invariant(
                 name="test",
                 criticality=Criticality.HIGH,
                 on_fail=OnFail.ERROR,
             )
-        assert "logic" in str(exc_info.value)
+        assert _errors(exc_info) == [(("logic",), "Field required")]
+
 
     def test_invariant_logic_minimum_length(self):
-        """Test invariant logic must be at least 5 characters."""
         with pytest.raises(ValidationError) as exc_info:
             Invariant(
                 name="test",
@@ -121,10 +113,9 @@ class TestInvariant:
                 criticality=Criticality.HIGH,
                 on_fail=OnFail.ERROR,
             )
-        assert "5 characters" in str(exc_info.value)
+        assert _errors(exc_info) == [(("logic",), "Value error, Invariant logic must be at least 5 characters")]
 
     def test_invariant_invalid_criticality(self):
-        """Test invalid criticality is rejected."""
         with pytest.raises(ValidationError) as exc_info:
             Invariant(
                 name="test",
@@ -132,10 +123,9 @@ class TestInvariant:
                 criticality="INVALID",
                 on_fail=OnFail.ERROR,
             )
-        assert "criticality" in str(exc_info.value).lower()
+        assert _errors(exc_info) == [(("criticality",), "Input should be 'HIGH', 'MEDIUM' or 'LOW'")]
 
     def test_invariant_invalid_on_fail(self):
-        """Test invalid on_fail is rejected."""
         with pytest.raises(ValidationError) as exc_info:
             Invariant(
                 name="test",
@@ -143,14 +133,11 @@ class TestInvariant:
                 criticality=Criticality.HIGH,
                 on_fail="invalid",
             )
-        assert "on_fail" in str(exc_info.value).lower()
+        assert _errors(exc_info) == [(("on_fail",), "Input should be 'error' or 'warn'")]
 
 
 class TestIOExample:
-    """Tests for IOExample model."""
-
     def test_valid_io_example(self):
-        """Test creating a valid IO example."""
         example = IOExample(
             input={"a": 1, "b": 2},
             output=3,
@@ -160,7 +147,6 @@ class TestIOExample:
         assert example.description is None
 
     def test_io_example_with_description(self):
-        """Test IO example with description."""
         example = IOExample(
             input={"x": [1, 2, 3]},
             output=[3, 2, 1],
@@ -169,20 +155,16 @@ class TestIOExample:
         assert example.description == "Reverses a list"
 
     def test_io_example_complex_types(self):
-        """Test IO example with complex nested types."""
         example = IOExample(
             input={"items": [{"id": 1}, {"id": 2}]},
             output={"result": {"total": 2, "ids": [1, 2]}},
         )
-        assert example.input["items"][0]["id"] == 1
-        assert example.output["result"]["total"] == 2
+        assert example.input == {"items": [{"id": 1}, {"id": 2}]}
+        assert example.output == {"result": {"total": 2, "ids": [1, 2]}}
 
 
 class TestContract:
-    """Tests for Contract model."""
-
     def _make_invariant(self, name: str = "test_inv") -> Invariant:
-        """Create a valid invariant for testing."""
         return Invariant(
             name=name,
             logic="Test invariant logic",
@@ -191,7 +173,6 @@ class TestContract:
         )
 
     def test_valid_contract(self):
-        """Test creating a valid contract."""
         contract = Contract(
             function_signature="def add(a: int, b: int) -> int",
             intent_summary="Adds two integers and returns the sum",
@@ -199,11 +180,10 @@ class TestContract:
         )
         assert contract.function_signature == "def add(a: int, b: int) -> int"
         assert contract.intent_summary == "Adds two integers and returns the sum"
-        assert len(contract.invariants) == 1
+        assert [i.name for i in contract.invariants] == ["test_inv"]
         assert contract.io_examples == []
 
     def test_contract_with_examples(self):
-        """Test contract with IO examples."""
         contract = Contract(
             function_signature="def add(a: int, b: int) -> int",
             intent_summary="Adds two integers and returns the sum",
@@ -213,68 +193,62 @@ class TestContract:
                 IOExample(input={"a": 0, "b": 0}, output=0),
             ],
         )
-        assert len(contract.io_examples) == 2
+        assert [(e.input, e.output) for e in contract.io_examples] == [({"a": 1, "b": 2}, 3), ({"a": 0, "b": 0}, 0)]
 
     def test_contract_function_signature_required(self):
-        """Test function signature is required."""
         with pytest.raises(ValidationError) as exc_info:
             Contract(
                 intent_summary="Does something",
                 invariants=[self._make_invariant()],
             )
-        assert "function_signature" in str(exc_info.value)
+        assert _errors(exc_info) == [(("function_signature",), "Field required")]
 
     def test_contract_function_signature_not_empty(self):
-        """Test function signature cannot be empty."""
         with pytest.raises(ValidationError) as exc_info:
             Contract(
                 function_signature="",
                 intent_summary="Does something useful here",
                 invariants=[self._make_invariant()],
             )
-        assert "signature" in str(exc_info.value).lower()
+        assert _errors(exc_info) == [(("function_signature",), "String should have at least 1 character")]
+
 
     def test_contract_intent_summary_required(self):
-        """Test intent summary is required."""
         with pytest.raises(ValidationError) as exc_info:
             Contract(
                 function_signature="def foo()",
                 invariants=[self._make_invariant()],
             )
-        assert "intent_summary" in str(exc_info.value)
+        assert _errors(exc_info) == [(("intent_summary",), "Field required")]
 
     def test_contract_intent_summary_minimum_length(self):
-        """Test intent summary must be at least 10 characters."""
         with pytest.raises(ValidationError) as exc_info:
             Contract(
                 function_signature="def foo()",
                 intent_summary="Short",
                 invariants=[self._make_invariant()],
             )
-        assert "10 characters" in str(exc_info.value)
+        assert _errors(exc_info) == [(("intent_summary",), "Value error, Intent summary must be at least 10 characters")]
+
 
     def test_contract_invariants_required(self):
-        """Test invariants list is required."""
         with pytest.raises(ValidationError) as exc_info:
             Contract(
                 function_signature="def foo()",
                 intent_summary="Does something useful here",
             )
-        assert "invariants" in str(exc_info.value)
+        assert _errors(exc_info) == [(("invariants",), "Field required")]
 
     def test_contract_invariants_not_empty(self):
-        """Test contract must have at least one invariant."""
         with pytest.raises(ValidationError) as exc_info:
             Contract(
                 function_signature="def foo()",
                 intent_summary="Does something useful here",
                 invariants=[],
             )
-        # Could be "at least 1" from min_length or "at least one" from validator
-        assert "invariant" in str(exc_info.value).lower()
+        assert _errors(exc_info) == [(("invariants",), "List should have at least 1 item after validation, not 0")]
 
     def test_contract_multiple_invariants(self):
-        """Test contract with multiple invariants."""
         contract = Contract(
             function_signature="def process(data: list) -> dict",
             intent_summary="Processes data and returns results",
@@ -284,14 +258,11 @@ class TestContract:
                 self._make_invariant("inv3"),
             ],
         )
-        assert len(contract.invariants) == 3
+        assert [i.name for i in contract.invariants] == ["inv1", "inv2", "inv3"]  # in the order given
 
 
 class TestContractSerialization:
-    """Tests for contract serialization."""
-
     def _make_contract(self) -> Contract:
-        """Create a valid contract for testing."""
         return Contract(
             function_signature="def add(a: int, b: int) -> int",
             intent_summary="Adds two integers and returns the sum",
@@ -309,40 +280,36 @@ class TestContractSerialization:
         )
 
     def test_to_json(self):
-        """Test contract serializes to JSON."""
         contract = self._make_contract()
         json_str = contract.to_json()
 
-        # Should be valid JSON
-        data = json.loads(json_str)
-        assert data["function_signature"] == "def add(a: int, b: int) -> int"
-        assert data["intent_summary"] == "Adds two integers and returns the sum"
-        assert len(data["invariants"]) == 1
-        assert data["invariants"][0]["name"] == "non_negative_inputs"
-        assert data["invariants"][0]["criticality"] == "MEDIUM"
-        assert data["invariants"][0]["on_fail"] == "warn"
+        assert json.loads(json_str) == {
+            "function_signature": "def add(a: int, b: int) -> int",
+            "intent_summary": "Adds two integers and returns the sum",
+            "invariants": [{"name": "non_negative_inputs", "logic": "Both inputs must be non-negative", "criticality": "MEDIUM", "on_fail": "warn"}],
+            "io_examples": [{"input": {"a": 1, "b": 2}, "output": 3, "description": None}],
+        }
 
     def test_to_json_pretty(self):
-        """Test contract serializes to pretty JSON."""
         contract = self._make_contract()
         json_str = contract.to_json(indent=2)
 
-        # Should have newlines and indentation
-        assert "\n" in json_str
-        assert "  " in json_str
+        assert json_str == json.dumps(json.loads(json_str), indent=2)  # two spaces, one key per line
+        assert json_str.startswith('{\n  "function_signature": ')
+        assert "\n" not in contract.to_json()  # compact by default
 
     def test_to_dict(self):
-        """Test contract converts to dictionary."""
         contract = self._make_contract()
         data = contract.to_dict()
 
-        assert isinstance(data, dict)
-        assert data["function_signature"] == "def add(a: int, b: int) -> int"
-        assert "invariants" in data
-        assert "io_examples" in data
+        assert data == {
+            "function_signature": "def add(a: int, b: int) -> int",
+            "intent_summary": "Adds two integers and returns the sum",
+            "invariants": [{"name": "non_negative_inputs", "logic": "Both inputs must be non-negative", "criticality": "MEDIUM", "on_fail": "warn"}],
+            "io_examples": [{"input": {"a": 1, "b": 2}, "output": 3, "description": None}],
+        }  # (the enums are str enums: they compare equal to their values)
 
     def test_from_json(self):
-        """Test contract deserializes from JSON."""
         json_str = '''
         {
             "function_signature": "def foo() -> str",
@@ -361,22 +328,19 @@ class TestContractSerialization:
 
         assert contract.function_signature == "def foo() -> str"
         assert contract.intent_summary == "Returns a greeting message"
-        assert len(contract.invariants) == 1
-        assert contract.invariants[0].criticality == Criticality.HIGH
+        assert contract.invariants == [Invariant(name="returns_string", logic="Always returns a non-empty string", criticality=Criticality.HIGH, on_fail=OnFail.ERROR)]
 
     def test_from_json_invalid(self):
-        """Test from_json raises ValueError for invalid JSON."""
         with pytest.raises(ValueError) as exc_info:
             Contract.from_json("not valid json")
-        assert "Invalid JSON" in str(exc_info.value)
+        assert str(exc_info.value) == "Invalid JSON: Expecting value: line 1 column 1 (char 0)"
 
     def test_from_json_missing_fields(self):
-        """Test from_json raises error for missing required fields."""
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError) as exc_info:
             Contract.from_json('{"function_signature": "def foo()"}')
+        assert _errors(exc_info) == [(("intent_summary",), "Field required"), (("invariants",), "Field required")]
 
     def test_from_dict(self):
-        """Test contract creates from dictionary."""
         data = {
             "function_signature": "def bar(x: int) -> int",
             "intent_summary": "Doubles the input value",
@@ -392,41 +356,30 @@ class TestContractSerialization:
         contract = Contract.from_dict(data)
 
         assert contract.function_signature == "def bar(x: int) -> int"
-        assert len(contract.invariants) == 1
+        assert [(i.name, i.criticality, i.on_fail) for i in contract.invariants] == [("doubles_value", Criticality.HIGH, OnFail.ERROR)]
 
     def test_roundtrip_json(self):
-        """Test contract survives JSON roundtrip."""
         original = self._make_contract()
         json_str = original.to_json()
         restored = Contract.from_json(json_str)
 
-        assert restored.function_signature == original.function_signature
-        assert restored.intent_summary == original.intent_summary
-        assert len(restored.invariants) == len(original.invariants)
-        assert restored.invariants[0].name == original.invariants[0].name
+        assert restored == original  # every field: signature, summary, invariants, io examples
+        assert Contract.from_dict(original.to_dict()) == original
 
     def test_snake_case_in_json(self):
-        """Test JSON output uses snake_case keys."""
         contract = self._make_contract()
         json_str = contract.to_json()
         data = json.loads(json_str)
 
-        # All keys should be snake_case
-        assert "function_signature" in data
-        assert "intent_summary" in data
-        assert "io_examples" in data
-        assert "on_fail" in data["invariants"][0]
-
-        # No camelCase
-        assert "functionSignature" not in data
-        assert "intentSummary" not in data
+        assert set(data) == {"function_signature", "intent_summary", "invariants", "io_examples"}  # no camelCase aliases
+        assert set(data["invariants"][0]) == {"name", "logic", "criticality", "on_fail"}
 
 
 class TestContractFromArchitectureExample:
-    """Test the example contract from architecture docs."""
+    """A realistic, non-trivial contract (not a minimal synthetic fixture)
+    exercising the schema end to end."""
 
     def test_architecture_example(self):
-        """Test the exact example from architecture.md."""
         contract_json = '''
         {
             "function_signature": "def reconcile_transactions(pending: List[Transaction], posted: List[Transaction]) -> ReconciliationResult",
@@ -455,9 +408,11 @@ class TestContractFromArchitectureExample:
         '''
         contract = Contract.from_json(contract_json)
 
-        assert "reconcile_transactions" in contract.function_signature
-        assert len(contract.invariants) == 2
-        assert contract.invariants[0].name == "no_duplicate_transaction_ids"
-        assert contract.invariants[0].criticality == Criticality.HIGH
-        assert contract.invariants[1].name == "balance_preserved"
-        assert len(contract.io_examples) == 1
+        assert contract.function_signature.startswith("def reconcile_transactions(pending: List[Transaction]")
+        assert [(i.name, i.criticality, i.on_fail) for i in contract.invariants] == [
+            ("no_duplicate_transaction_ids", Criticality.HIGH, OnFail.ERROR),
+            ("balance_preserved", Criticality.HIGH, OnFail.ERROR),
+        ]
+        assert [(e.input, e.output) for e in contract.io_examples] == [
+            ({"pending": [{"id": 1, "amount": 100}], "posted": []}, {"merged": [{"id": 1, "amount": 100}], "discrepancies": []})
+        ]

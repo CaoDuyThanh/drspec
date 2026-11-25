@@ -1,0 +1,86 @@
+{
+  "tests/integration/test_declaration_removal.py::TestBothGoInOneScan::test_the_index_is_the_index_of_a_fresh_scan": {
+    "tier": "integration"
+  },
+  "tests/integration/test_declaration_removal.py::TestTheDeclarationGoesFirst::test_the_definition_stays_and_goes_with_the_next_edit_of_its_file": {
+    "tier": "integration"
+  },
+  "tests/integration/test_declaration_removal.py::TestTheDefinitionGoesFirst::test_the_prototype_stays_as_an_unmatched_declaration_and_goes_with_the_next_edit_of_the_header": {
+    "tier": "integration"
+  },
+  "tests/unit/test_cli_app.py::test_app_exists": {
+    "tier": "unit"
+  },
+  "tests/unit/test_cli_app.py::test_no_args_shows_help": {
+    "tier": "component"
+  },
+  "tests/unit/test_cli_app.py::test_version_flag": {
+    "tier": "component"
+  },
+  "tests/unit/test_cli_app.py::test_version_short_flag": {
+    "tier": "component"
+  },
+  "tests/unit/test_declaration_removal.py::TestTheStartingPoint::test_the_declarations_are_aliases_of_the_definitions": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_a_caller_that_mentions_a_changed_name_is_re_resolved": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_an_unrelated_change_does_not_re_resolve_the_rest_of_the_project": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[a change nobody depends on]": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[a constructor starts to resolve when the class gains __init__]": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[a file is deleted]": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[a function the caller imports by name appears]": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[a function the caller uses is removed]": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[a function the caller uses is renamed]": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[a method becomes a property]": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[a method the caller needs is added to an annotated class]": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[a module import starts to resolve]": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[a new file whose function a caller already calls by bare name]": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[a second file with the same stem makes an import ambiguous]": {
+    "tier": "component"
+  },
+  "tests/unit/test_incremental_resolution.py::test_the_filtered_sync_leaves_exactly_the_edges_a_full_one_does[an aliased import starts to resolve]": {
+    "tier": "component"
+  },
+  "tests/unit/test_mcp_serve_command.py::TestMcpServeCommand::test_defaults_to_drspec_contracts_db_under_cwd": {
+    "tier": "component"
+  },
+  "tests/unit/test_mcp_serve_command.py::TestMcpServeCommand::test_does_not_require_drspec_init_up_front": {
+    "tier": "component"
+  },
+  "tests/unit/test_mcp_serve_command.py::TestMcpServeCommand::test_respects_the_global_db_override": {
+    "tier": "component"
+  },
+  "tests/unit/test_version.py::test_version_exists": {
+    "tier": "unit"
+  },
+  "tests/unit/test_version.py::test_version_format": {
+    "tier": "unit"
+  },
+  "tests/unit/test_version.py::test_version_matches_version_file": {
+    "tier": "unit"
+  }
+}

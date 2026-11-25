@@ -1,18 +1,19 @@
-"""Tests for the unified function extraction engine."""
+"""Tests for the unified function extraction engine. A directory scan of real files is the objective (they are in `tmp_path`); the language
+detection, the ignore patterns and the model are pure and are marked unit."""
 
-import tempfile
 from pathlib import Path
 
 import pytest
 
 from drspec.core.scanner import (
-    Scanner,
     ScannedFunction,
+    Scanner,
     ScanProgress,
     ScanResult,
-    scan_file,
     scan_directory,
+    scan_file,
 )
+from tests.helpers import fid
 
 
 @pytest.fixture
@@ -22,14 +23,13 @@ def scanner():
 
 
 @pytest.fixture
-def temp_project():
+def temp_project(tmp_path):
     """Create a temporary project directory with sample files."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        root = Path(tmpdir)
+    root = tmp_path
 
-        # Create Python file
-        py_file = root / "main.py"
-        py_file.write_text('''
+    # Create Python file
+    py_file = root / "main.py"
+    py_file.write_text('''
 def hello():
     return "world"
 
@@ -38,9 +38,9 @@ class Calculator:
         return a + b
 ''')
 
-        # Create JavaScript file
-        js_file = root / "app.js"
-        js_file.write_text('''
+    # Create JavaScript file
+    js_file = root / "app.js"
+    js_file.write_text('''
 function greet() {
     return "hello";
 }
@@ -48,9 +48,9 @@ function greet() {
 const add = (a, b) => a + b;
 ''')
 
-        # Create C++ file
-        cpp_file = root / "utils.cpp"
-        cpp_file.write_text('''
+    # Create C++ file
+    cpp_file = root / "utils.cpp"
+    cpp_file.write_text('''
 void process() {
     return;
 }
@@ -63,35 +63,36 @@ public:
 };
 ''')
 
-        # Create header file
-        header_file = root / "utils.h"
-        header_file.write_text('''
+    # Create header file
+    header_file = root / "utils.h"
+    header_file.write_text('''
 void process();
 ''')
 
-        # Create subdirectory with file
-        subdir = root / "lib"
-        subdir.mkdir()
-        (subdir / "helper.py").write_text('''
+    # Create subdirectory with file
+    subdir = root / "lib"
+    subdir.mkdir()
+    (subdir / "helper.py").write_text('''
 def helper_func():
     pass
 ''')
 
-        # Create ignored directory
-        gitdir = root / ".git"
-        gitdir.mkdir()
-        (gitdir / "config").write_text("# git config")
+    # Create ignored directory
+    gitdir = root / ".git"
+    gitdir.mkdir()
+    (gitdir / "config").write_text("# git config")
 
-        # Create node_modules (should be ignored)
-        node_modules = root / "node_modules"
-        node_modules.mkdir()
-        (node_modules / "package.js").write_text('''
+    # Create node_modules (should be ignored)
+    node_modules = root / "node_modules"
+    node_modules.mkdir()
+    (node_modules / "package.js").write_text('''
 function ignored() {}
 ''')
 
-        yield root
+    return root
 
 
+@pytest.mark.unit
 class TestLanguageDetection:
     """Tests for language detection."""
 
@@ -112,7 +113,8 @@ class TestLanguageDetection:
         assert scanner.detect_language("main.cpp") == "cpp"
         assert scanner.detect_language("util.cc") == "cpp"
         assert scanner.detect_language("lib.cxx") == "cpp"
-        assert scanner.detect_language("legacy.c") == "cpp"
+        assert scanner.detect_language("legacy.c") == "c"  # read by the C++ parser, stored as its own label
+        assert scanner.detect_language("Legacy.C") == "cpp"  # by Unix convention a capital `.C` is C++
         assert scanner.detect_language("header.h") == "cpp"
         assert scanner.detect_language("header.hpp") == "cpp"
 
@@ -128,6 +130,7 @@ class TestLanguageDetection:
         assert scanner.is_supported("readme.md") is False
 
 
+@pytest.mark.unit
 class TestIgnorePatterns:
     """Tests for ignore pattern handling."""
 
@@ -162,6 +165,7 @@ class TestIgnorePatterns:
         assert ".git" not in scanner.ignore_patterns
 
 
+@pytest.mark.component  # a real file, parsed by the real parsers
 class TestScanFile:
     """Tests for scanning individual files."""
 
@@ -170,15 +174,11 @@ class TestScanFile:
         result = scanner.scan_file(temp_project / "main.py", relative_to=temp_project)
 
         assert result.files_scanned == 1
-        assert len(result.functions) == 2  # hello and Calculator.add
-
-        names = {f.name for f in result.functions}
-        assert "hello" in names
-        assert "add" in names
+        assert [f.name for f in result.functions] == ["hello", "add"]  # hello and Calculator.add
 
         # Check function_id format
         hello_func = next(f for f in result.functions if f.name == "hello")
-        assert hello_func.function_id == "main.py::hello"
+        assert hello_func.function_id == fid("main.py", "hello")
         assert hello_func.language == "python"
 
     def test_scan_javascript_file(self, scanner, temp_project):
@@ -186,11 +186,7 @@ class TestScanFile:
         result = scanner.scan_file(temp_project / "app.js", relative_to=temp_project)
 
         assert result.files_scanned == 1
-        assert len(result.functions) == 2  # greet and add
-
-        names = {f.name for f in result.functions}
-        assert "greet" in names
-        assert "add" in names
+        assert sorted(f.name for f in result.functions) == ["add", "greet"]
 
         greet_func = next(f for f in result.functions if f.name == "greet")
         assert greet_func.language == "javascript"
@@ -200,11 +196,7 @@ class TestScanFile:
         result = scanner.scan_file(temp_project / "utils.cpp", relative_to=temp_project)
 
         assert result.files_scanned == 1
-        assert len(result.functions) == 2  # process and Helper::run
-
-        names = {f.name for f in result.functions}
-        assert "process" in names
-        assert "run" in names
+        assert sorted(f.name for f in result.functions) == ["process", "run"]  # process and Helper::run
 
     def test_scan_unsupported_file(self, scanner, temp_project):
         """Test scanning unsupported file type."""
@@ -223,9 +215,10 @@ class TestScanFile:
         result = scanner.scan_file(temp_project / "nonexistent.py", relative_to=temp_project)
 
         assert result.files_scanned == 0
-        assert len(result.errors) == 1
+        assert [(e.file, e.message) for e in result.errors] == [("nonexistent.py", "File not found")]
 
 
+@pytest.mark.component  # a real folder of files, parsed by the real parsers
 class TestScanDirectory:
     """Tests for directory scanning."""
 
@@ -234,30 +227,31 @@ class TestScanDirectory:
         result = scanner.scan_directory(temp_project, recursive=True)
 
         # Should find files in root and lib/ but not .git/ or node_modules/
-        assert result.files_scanned >= 4  # main.py, app.js, utils.cpp, utils.h, lib/helper.py
-
-        # Check that functions from different languages were found
-        languages = {f.language for f in result.functions}
-        assert "python" in languages
-        assert "javascript" in languages
-        assert "cpp" in languages
+        assert result.files_scanned == 5  # main.py, app.js, utils.cpp, utils.h, lib/helper.py
+        assert sorted((f.file_path, f.name, f.language) for f in result.functions) == [
+            ("app.js", "add", "javascript"), ("app.js", "greet", "javascript"),
+            ("lib/helper.py", "helper_func", "python"),
+            ("main.py", "add", "python"), ("main.py", "hello", "python"),
+            ("utils.cpp", "process", "cpp"), ("utils.cpp", "run", "cpp"),
+            ("utils.h", "process", "cpp"),
+        ]
 
     def test_scan_directory_non_recursive(self, scanner, temp_project):
         """Test non-recursive directory scanning."""
         result = scanner.scan_directory(temp_project, recursive=False)
 
         # Should only find files in root, not lib/
-        file_paths = {f.file_path for f in result.functions}
-        assert not any("lib" in p for p in file_paths)
+        assert result.files_scanned == 4
+        assert {f.file_path for f in result.functions} == {"main.py", "app.js", "utils.cpp", "utils.h"}
 
     def test_scan_directory_ignores_patterns(self, scanner, temp_project):
         """Test that ignore patterns are respected."""
         result = scanner.scan_directory(temp_project, recursive=True)
 
-        # Should not include functions from ignored directories
-        function_ids = {f.function_id for f in result.functions}
-        assert not any("node_modules" in fid for fid in function_ids)
-        assert not any(".git" in fid for fid in function_ids)
+        # The ignored folders hold a supported file each (node_modules/package.js): they are left out, the five others are scanned
+        assert result.files_scanned == 5
+        assert {f.file_path for f in result.functions} == {"main.py", "app.js", "utils.cpp", "utils.h", "lib/helper.py"}
+        assert "ignored" not in {f.name for f in result.functions}
 
     def test_scan_directory_progress_callback(self, scanner, temp_project):
         """Test progress callback during scanning."""
@@ -272,17 +266,15 @@ class TestScanDirectory:
             progress_callback=on_progress,
         )
 
-        # Should have progress updates
-        assert len(progress_updates) > 0
-
-        # First update should have current=1
-        assert progress_updates[0].current == 1
-
-        # Last update should have current == total
-        last = progress_updates[-1]
-        assert last.current == last.total
+        # One update per file scanned, counting from 1 to the total of 5
+        assert [(update.current, update.total) for update in progress_updates] == [(1, 5), (2, 5), (3, 5), (4, 5), (5, 5)]
+        # each names the file it has just scanned (relative to the folder), and the functions found so far only grow, to the 8 of the folder
+        assert sorted(update.current_file for update in progress_updates) == ["app.js", "lib/helper.py", "main.py", "utils.cpp", "utils.h"]
+        found = [update.functions_found for update in progress_updates]
+        assert found == sorted(found) and found[0] >= 1 and found[-1] == 8
 
 
+@pytest.mark.unit
 class TestScanFunctionModel:
     """Tests for ScannedFunction model."""
 
@@ -307,7 +299,7 @@ class TestScanFunctionModel:
             extracted, "src/module.py", "python"
         )
 
-        assert scanned.function_id == "src/module.py::MyClass.test"
+        assert scanned.function_id == fid("src/module.py", "MyClass.test")
         assert scanned.file_path == "src/module.py"
         assert scanned.name == "test"
         assert scanned.qualified_name == "MyClass.test"
@@ -316,6 +308,7 @@ class TestScanFunctionModel:
         assert "staticmethod" in scanned.decorators
 
 
+@pytest.mark.component
 class TestConvenienceFunctions:
     """Tests for convenience functions."""
 
@@ -324,25 +317,28 @@ class TestConvenienceFunctions:
         result = scan_file(temp_project / "main.py")
 
         assert result.files_scanned == 1
-        assert len(result.functions) >= 1
+        assert [f.name for f in result.functions] == ["hello", "add"]
+        assert {f.file_path for f in result.functions} == {str(temp_project / "main.py")}  # no `relative_to`: the path as given
 
     def test_scan_directory_convenience(self, temp_project):
         """Test the scan_directory convenience function."""
         result = scan_directory(temp_project)
 
-        assert result.files_scanned >= 1
-        assert len(result.functions) >= 1
+        assert result.files_scanned == 5
+        assert sorted({f.file_path for f in result.functions}) == ["app.js", "lib/helper.py", "main.py", "utils.cpp", "utils.h"]
 
     def test_scan_directory_custom_ignores(self, temp_project):
         """Test scan_directory with custom ignore patterns."""
         # Include node_modules by not ignoring it
         result = scan_directory(temp_project, ignore_patterns=[".git"])
 
-        function_ids = {f.function_id for f in result.functions}
-        # Now node_modules should be included
-        assert any("node_modules" in fid for fid in function_ids)
+        # Now node_modules is included: its one file is scanned with the five others
+        assert result.files_scanned == 6
+        assert [f.file_path for f in result.functions if "node_modules" in f.function_id] == ["node_modules/package.js"]
+        assert not [f for f in result.functions if f.file_path.startswith(".git")]  # .git is still ignored
 
 
+@pytest.mark.component
 class TestIterScanDirectory:
     """Tests for streaming directory scanning."""
 
@@ -350,47 +346,44 @@ class TestIterScanDirectory:
         """Test iterating through scan results."""
         results = list(scanner.iter_scan_directory(temp_project))
 
-        assert len(results) >= 4
-
         for path, result in results:
             assert isinstance(path, Path)
             assert isinstance(result, ScanResult)
+        assert sorted((path.relative_to(temp_project).as_posix(), len(result.functions)) for path, result in results) == [
+            ("app.js", 2), ("lib/helper.py", 1), ("main.py", 2), ("utils.cpp", 2), ("utils.h", 1),
+        ]
 
 
+@pytest.mark.component
 class TestEdgeCases:
     """Tests for edge cases."""
 
-    def test_empty_directory(self, scanner):
+    def test_empty_directory(self, scanner, tmp_path):
         """Test scanning an empty directory."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            result = scanner.scan_directory(tmpdir)
+        result = scanner.scan_directory(str(tmp_path))
 
-            assert result.files_scanned == 0
-            assert len(result.functions) == 0
+        assert result.files_scanned == 0
+        assert result.functions == []
 
-    def test_syntax_error_handling(self, scanner):
+    def test_syntax_error_handling(self, scanner, tmp_path):
         """Test handling files with syntax errors."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            root = Path(tmpdir)
-            bad_file = root / "bad.py"
-            bad_file.write_text("def broken(:\n    pass")
+        bad_file = tmp_path / "bad.py"
+        bad_file.write_text("def broken(:\n    pass")
 
-            result = scanner.scan_file(bad_file)
+        result = scanner.scan_file(bad_file)
 
-            # Should report errors but not crash
-            # The file is scanned and syntax errors are collected
-            assert result.files_scanned == 1
-            assert len(result.errors) >= 1  # Should have at least one error
+        # Should report errors but not crash: the file is scanned and the syntax error is collected, with where it is
+        assert result.files_scanned == 1
+        assert [(e.file, e.message, e.line) for e in result.errors] == [(str(bad_file), "Missing token", 1)]
+        assert result.functions == []
 
-    def test_binary_file_handling(self, scanner):
+    def test_binary_file_handling(self, scanner, tmp_path):
         """Test handling binary files (should skip)."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            root = Path(tmpdir)
-            binary = root / "data.bin"
-            binary.write_bytes(b"\x00\x01\x02\x03")
+        binary = tmp_path / "data.bin"
+        binary.write_bytes(b"\x00\x01\x02\x03")
 
-            result = scanner.scan_file(binary)
+        result = scanner.scan_file(binary)
 
-            # Should skip unsupported file
-            assert result.files_skipped == 1
-            assert len(result.functions) == 0
+        # Should skip unsupported file
+        assert result.files_skipped == 1
+        assert len(result.functions) == 0

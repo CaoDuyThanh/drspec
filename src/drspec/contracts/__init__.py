@@ -55,8 +55,7 @@ from drspec.contracts.executor import (
     validate_script,
 )
 
-# Note: Runtime verification APIs are now in drspec.debugging module
-# to avoid circular import issues with Pydantic on Python 3.8
+# Runtime verification APIs live in drspec.debugging to avoid a Pydantic/Python 3.8 circular import.
 
 __all__ = [
     # Schema

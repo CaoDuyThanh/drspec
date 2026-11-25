@@ -13,10 +13,8 @@ import duckdb
 
 from drspec.db import get_config, set_config
 
-# Default confidence threshold (percentage)
 DEFAULT_CONFIDENCE_THRESHOLD = 70
 
-# Config key for confidence threshold
 CONFIG_KEY_CONFIDENCE_THRESHOLD = "confidence_threshold"
 
 
@@ -59,7 +57,6 @@ def get_confidence_threshold(
 
     try:
         threshold = int(value)
-        # Clamp to valid range
         return max(0, min(100, threshold))
     except ValueError:
         return DEFAULT_CONFIDENCE_THRESHOLD
@@ -187,7 +184,6 @@ def get_confidence_distribution(
         """
     ).fetchall()
 
-    # Initialize all levels with 0
     distribution = {
         "high": 0,
         "good": 0,
@@ -218,7 +214,6 @@ def suggest_threshold(
     Returns:
         Suggested threshold (0-100).
     """
-    # Get all confidence scores
     result = conn.execute(
         "SELECT confidence_score FROM contracts ORDER BY confidence_score DESC"
     ).fetchall()
@@ -229,17 +224,15 @@ def suggest_threshold(
     scores = [int(row[0] * 100) for row in result]
     total = len(scores)
 
-    # Find threshold that gives approximately target_verified_ratio
     target_verified_count = int(total * target_verified_ratio)
 
     if target_verified_count >= total:
-        # All should be verified, use minimum score
+        # Every score qualifies as verified, so the minimum itself is a valid threshold.
         return min(scores)
     elif target_verified_count <= 0:
-        # None should be verified, use above maximum
+        # No score should qualify, so push the threshold just above the maximum.
         return min(100, max(scores) + 1)
     else:
-        # Return the score at the target position
         return scores[target_verified_count - 1]
 
 

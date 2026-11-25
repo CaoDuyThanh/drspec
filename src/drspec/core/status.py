@@ -280,7 +280,6 @@ def get_file_status_summary(
     Returns:
         StatusSummary for artifacts in the file.
     """
-    # Count by querying with file_path filter
     total = len(list_artifacts(conn, file_path=file_path, limit=10000))
 
     pending = len(list_artifacts(conn, file_path=file_path, status="PENDING", limit=10000))
@@ -314,7 +313,6 @@ def get_language_status_summary(
     Returns:
         StatusSummary for artifacts in the language.
     """
-    # Count by querying with language filter
     total = len(list_artifacts(conn, language=language, limit=10000))
 
     pending = len(list_artifacts(conn, language=language, status="PENDING", limit=10000))

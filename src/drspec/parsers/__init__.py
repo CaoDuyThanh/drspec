@@ -6,6 +6,7 @@ from drspec.parsers.models import ExtractedFunction, ParseResult, ParseError
 from drspec.parsers.python_parser import PythonParser
 from drspec.parsers.javascript_parser import JavaScriptParser
 from drspec.parsers.cpp_parser import CppParser
+from drspec.parsers.rust_parser import RustParser
 
 __all__ = [
     "ExtractedFunction",
@@ -14,4 +15,5 @@ __all__ = [
     "PythonParser",
     "JavaScriptParser",
     "CppParser",
+    "RustParser",
 ]

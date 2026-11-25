@@ -6,6 +6,31 @@ All notable changes to this project will be documented in this file.
 - **Removed** - features removed in this release
 - **Fixed** - bug fixes
 
+## v1.0.0
+
+**Added**
+- Background indexing worker and persistent code/dependency graph with incremental rescans.
+- Local-embedding semantic search, qualified-name search, member references, and YAML key lookup.
+- MCP server, agent tools, and IDE setup for assistant integrations.
+- C, Rust, and TypeScript scanning, plus a live graph viewer.
+- Parser diagnostics, trace tools, and worker status commands.
+
+**Changed**
+- Scans publish larger, cancellable batches; parser changes trigger background reindexing.
+- Search and reference results identify stale or partially indexed files.
+- Status and scan output is concise by default, with details available on request.
+- Unreadable files are parked until changed or explicitly rescanned.
+
+**Fixed**
+- C/C++ and Rust parsing, call resolution, and template/member references.
+- Worker startup, cancellation, and large-project indexing reliability.
+- File deletion and parser migrations keep index records consistent.
+- Semantic search reports embedding coverage and unavailable results.
+
+**Removed**
+- Legacy function `drspec queue` commands and table; the worker manages indexing and rescan work.
+- The `prefer_drspec` grep hook; MCP instructions guide tool selection.
+
 ## v0.1.0
 
 **Added**

@@ -1,42 +1,43 @@
-"""Tests for networkx graph visualization."""
+"""Tests for networkx graph visualization: the graph itself and its HTML page. The databases are in memory. No test here draws a figure (the
+matplotlib drawing is not tested)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import duckdb
 import pytest
 
 from drspec.db import (
-    get_connection,
     init_schema,
     insert_artifact,
-    insert_dependency,
 )
 from drspec.visualization import (
     GraphResult,
-    generate_dependency_graph,
-    generate_full_graph,
     build_dependency_graph,
     build_full_graph,
+    generate_dependency_graph_html,
+    render_graph_html,
+    render_live_graph_html,
 )
-from drspec.visualization.grapher import STATUS_COLORS
-
+from drspec.visualization.grapher import STATUS_COLORS, _scale_positions, layout_graph
+from tests.helpers import insert_dependency
 
 # =============================================================================
 # Fixtures
 # =============================================================================
 
 
-@pytest.fixture
-def db_with_deps(tmp_path):
-    """Create a database with artifacts and dependencies."""
-    db_path = tmp_path / "_drspec" / "drspec.db"
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    conn = get_connection(str(db_path))
+def _memory_database():
+    conn = duckdb.connect(":memory:")  # only the graph tables are read: no file
     init_schema(conn)
+    return conn
 
-    # Create a simple dependency tree:
+
+@pytest.fixture
+def db_with_deps():
+    conn = _memory_database()
+
     # main -> process -> validate
     #      -> transform
     artifacts = [
@@ -61,24 +62,18 @@ def db_with_deps(tmp_path):
             status=status,
         )
 
-    # Add dependencies
     insert_dependency(conn, "src/app.py::main", "src/app.py::process")
     insert_dependency(conn, "src/app.py::main", "src/app.py::transform")
     insert_dependency(conn, "src/app.py::process", "src/app.py::validate")
 
-    return conn
+    yield conn
+    conn.close()
 
 
 @pytest.fixture
-def db_with_large_graph(tmp_path):
-    """Create a database with many functions for testing limits."""
-    db_path = tmp_path / "_drspec" / "drspec.db"
-    db_path.parent.mkdir(parents=True, exist_ok=True)
+def db_with_large_graph():
+    conn = _memory_database()
 
-    conn = get_connection(str(db_path))
-    init_schema(conn)
-
-    # Create 20 functions
     for i in range(20):
         insert_artifact(
             conn,
@@ -94,28 +89,22 @@ def db_with_large_graph(tmp_path):
             status="PENDING",
         )
 
-    # Create chain dependencies: func_0 -> func_1 -> func_2 -> ...
     for i in range(19):
         insert_dependency(conn, f"src/module.py::func_{i}", f"src/module.py::func_{i+1}")
 
-    return conn
+    yield conn
+    conn.close()
 
 
 @pytest.fixture
-def empty_db(tmp_path):
-    """Create an empty database."""
-    db_path = tmp_path / "_drspec" / "drspec.db"
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    conn = get_connection(str(db_path))
-    init_schema(conn)
-
-    return conn
+def empty_db():
+    conn = _memory_database()
+    yield conn
+    conn.close()
 
 
 @pytest.fixture
 def output_dir(tmp_path):
-    """Create a temporary output directory."""
     plots_dir = tmp_path / "plots"
     plots_dir.mkdir()
     return str(plots_dir)
@@ -126,11 +115,11 @@ def output_dir(tmp_path):
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestBuildDependencyGraph:
     """Tests for build_dependency_graph function."""
 
     def test_builds_graph_from_center(self, db_with_deps):
-        """Should build graph centered on a function."""
         G = build_dependency_graph(db_with_deps, "src/app.py::main", depth=2)
 
         assert len(G.nodes()) == 4
@@ -140,14 +129,12 @@ class TestBuildDependencyGraph:
         assert "src/app.py::transform" in G.nodes()
 
     def test_center_node_marked(self, db_with_deps):
-        """Should mark center node."""
         G = build_dependency_graph(db_with_deps, "src/app.py::main", depth=2)
 
         assert G.nodes["src/app.py::main"]["is_center"] is True
         assert G.nodes["src/app.py::process"]["is_center"] is False
 
     def test_nodes_have_status(self, db_with_deps):
-        """Should include status in node attributes."""
         G = build_dependency_graph(db_with_deps, "src/app.py::main", depth=2)
 
         assert G.nodes["src/app.py::main"]["status"] == "PENDING"
@@ -155,14 +142,12 @@ class TestBuildDependencyGraph:
         assert G.nodes["src/app.py::transform"]["status"] == "NEEDS_REVIEW"
 
     def test_nodes_have_name(self, db_with_deps):
-        """Should include function name in node attributes."""
         G = build_dependency_graph(db_with_deps, "src/app.py::main", depth=2)
 
         assert G.nodes["src/app.py::main"]["name"] == "main"
         assert G.nodes["src/app.py::process"]["name"] == "process"
 
     def test_edges_correct(self, db_with_deps):
-        """Should have correct edges."""
         G = build_dependency_graph(db_with_deps, "src/app.py::main", depth=2)
 
         assert G.has_edge("src/app.py::main", "src/app.py::process")
@@ -170,60 +155,51 @@ class TestBuildDependencyGraph:
         assert G.has_edge("src/app.py::process", "src/app.py::validate")
 
     def test_depth_limiting(self, db_with_deps):
-        """Should respect depth limit."""
         G = build_dependency_graph(db_with_deps, "src/app.py::main", depth=1)
 
-        # At depth 1, should get main and direct children only
         assert "src/app.py::main" in G.nodes()
         assert "src/app.py::process" in G.nodes()
         assert "src/app.py::transform" in G.nodes()
-        # validate is at depth 2
+        # validate is two hops away (depth 2)
         assert "src/app.py::validate" not in G.nodes()
 
     def test_direction_callees_only(self, db_with_deps):
-        """Should only follow callees when direction=callees."""
         G = build_dependency_graph(
             db_with_deps, "src/app.py::process", depth=2, direction="callees"
         )
 
-        # Should have process and its callee validate
         assert "src/app.py::process" in G.nodes()
         assert "src/app.py::validate" in G.nodes()
-        # Should not have main (caller)
+        # main is a caller, not a callee, of process
         assert "src/app.py::main" not in G.nodes()
 
     def test_direction_callers_only(self, db_with_deps):
-        """Should only follow callers when direction=callers."""
         G = build_dependency_graph(
             db_with_deps, "src/app.py::validate", depth=2, direction="callers"
         )
 
-        # Should have validate and its callers
         assert "src/app.py::validate" in G.nodes()
         assert "src/app.py::process" in G.nodes()
-        # Should not have transform (sibling)
+        # transform is a sibling, not a caller, of validate
         assert "src/app.py::transform" not in G.nodes()
 
     def test_nonexistent_function(self, empty_db):
-        """Should return empty graph for nonexistent function."""
         G = build_dependency_graph(empty_db, "nonexistent::func", depth=2)
 
         assert len(G.nodes()) == 0
         assert len(G.edges()) == 0
 
 
+@pytest.mark.unit
 class TestBuildFullGraph:
     """Tests for build_full_graph function."""
 
     def test_builds_all_functions(self, db_with_deps):
-        """Should build graph with all functions."""
         G = build_full_graph(db_with_deps)
 
         assert len(G.nodes()) == 4
 
     def test_filters_by_path_prefix(self, db_with_deps, tmp_path):
-        """Should filter by path prefix."""
-        # Add function in different path
         insert_artifact(
             db_with_deps,
             function_id="lib/util.py::helper",
@@ -239,12 +215,10 @@ class TestBuildFullGraph:
 
         G = build_full_graph(db_with_deps, path_prefix="src/")
 
-        # Should only have src/ functions
         assert len(G.nodes()) == 4
         assert "lib/util.py::helper" not in G.nodes()
 
     def test_respects_max_nodes(self, db_with_large_graph):
-        """Should respect max_nodes limit."""
         G = build_full_graph(db_with_large_graph, max_nodes=5)
 
         assert len(G.nodes()) == 5
@@ -255,24 +229,39 @@ class TestBuildFullGraph:
 # =============================================================================
 
 
-class TestGenerateDependencyGraph:
-    """Tests for generate_dependency_graph function."""
+@pytest.mark.unit
+class TestGenerateDependencyGraphHtml:
+    """Tests for generate_dependency_graph_html."""
 
-    def test_generates_graph_image(self, db_with_deps, output_dir):
-        """Should generate a graph image."""
-        result = generate_dependency_graph(
+    def test_generates_html_file(self, db_with_deps, output_dir):
+        result = generate_dependency_graph_html(
             db_with_deps,
             "src/app.py::main",
             output_dir=output_dir,
         )
 
         assert isinstance(result, GraphResult)
-        assert result.plot_type == "graph"
+        assert result.plot_type == "graph_html"
+        assert Path(result.path).exists()
+        assert Path(result.path).suffix == ".html"
+
+    def test_output_file_is_used_verbatim_not_replaced_by_a_hashed_name(self, db_with_deps, tmp_path):
+        target = tmp_path / "custom" / "my-graph.html"
+
+        result = generate_dependency_graph_html(db_with_deps, "src/app.py::main", output_file=str(target))
+
+        assert result.path == str(target.resolve())
+        assert target.read_text(encoding="utf-8").lstrip().startswith("<")
+        assert not list(target.parent.glob("graph_*.html"))
+
+    def test_output_file_without_extension_gets_html(self, db_with_deps, tmp_path):
+        result = generate_dependency_graph_html(db_with_deps, "src/app.py::main", output_file=str(tmp_path / "plain"))
+
+        assert result.path == str((tmp_path / "plain.html").resolve())
         assert Path(result.path).exists()
 
     def test_result_has_correct_counts(self, db_with_deps, output_dir):
-        """Should return correct node and edge counts."""
-        result = generate_dependency_graph(
+        result = generate_dependency_graph_html(
             db_with_deps,
             "src/app.py::main",
             depth=2,
@@ -281,32 +270,11 @@ class TestGenerateDependencyGraph:
 
         assert result.nodes == 4
         assert result.edges == 3
-        assert result.data_points == 4
-
-    def test_result_has_center_function(self, db_with_deps, output_dir):
-        """Should include center function in result."""
-        result = generate_dependency_graph(
-            db_with_deps,
-            "src/app.py::main",
-            output_dir=output_dir,
-        )
-
         assert result.center_function == "src/app.py::main"
 
-    def test_result_has_dimensions(self, db_with_deps, output_dir):
-        """Should include dimensions in result."""
-        result = generate_dependency_graph(
-            db_with_deps,
-            "src/app.py::main",
-            output_dir=output_dir,
-        )
-
-        assert result.width == 1200  # 12 * 100 DPI
-        assert result.height == 800  # 8 * 100 DPI
 
     def test_handles_empty_graph(self, empty_db, output_dir):
-        """Should handle nonexistent function gracefully."""
-        result = generate_dependency_graph(
+        result = generate_dependency_graph_html(
             empty_db,
             "nonexistent::func",
             output_dir=output_dir,
@@ -315,55 +283,145 @@ class TestGenerateDependencyGraph:
         assert result.nodes == 0
         assert result.edges == 0
         assert Path(result.path).exists()
+        assert "<html" in Path(result.path).read_text()
 
-    def test_deterministic_filename(self, db_with_deps, output_dir):
-        """Should generate deterministic filenames."""
-        result1 = generate_dependency_graph(
-            db_with_deps,
-            "src/app.py::main",
-            output_dir=output_dir,
+    def test_html_is_fully_self_contained_no_network_dependency(self, db_with_deps, output_dir):
+        """No CDN, no network call. The `http://www.w3.org/2000/svg`
+        namespace URI is a required XML identifier, not a fetched
+        resource, so it doesn't trip these checks."""
+        result = generate_dependency_graph_html(db_with_deps, "src/app.py::main", output_dir=output_dir)
+        content = Path(result.path).read_text()
+
+        assert "<script src=" not in content
+        assert "<link " not in content
+        assert "fetch(" not in content
+        assert "cdn." not in content.lower()
+
+    def test_html_embeds_real_node_and_edge_data(self, db_with_deps, output_dir):
+        result = generate_dependency_graph_html(db_with_deps, "src/app.py::main", output_dir=output_dir)
+        content = Path(result.path).read_text()
+
+        assert "src/app.py::main" in content
+        assert "src/app.py::process" in content
+        assert '"relation": "calls"' in content
+
+
+@pytest.mark.unit
+class TestRenderGraphHtml:
+    """Tests for render_graph_html directly."""
+
+    def test_renders_relation_and_confidence_on_edges(self):
+        import networkx as nx
+
+        G = nx.DiGraph()
+        G.add_node("a", status="PENDING", name="a", signature="def a():", file_path="x.py", is_center=True)
+        G.add_node("b", status="VERIFIED", name="b", signature="def b():", file_path="x.py", is_center=False)
+        G.add_edge("a", "b", relation="references", confidence="AMBIGUOUS", text="a.b")
+        pos = layout_graph(G)
+
+        doc = render_graph_html(G, pos, title="Test")
+
+        assert "<!DOCTYPE html>" in doc
+        assert '"relation": "references"' in doc
+        assert '"confidence": "AMBIGUOUS"' in doc
+        assert "a.b" in doc
+
+    def test_escapes_script_terminator_in_embedded_data(self):
+        """A `</script>`-looking substring inside a signature/call-site
+        must not terminate the embedded JSON script block early."""
+        import networkx as nx
+
+        G = nx.DiGraph()
+        G.add_node(
+            "a",
+            status="PENDING",
+            name="a",
+            signature="def a():  # </script><script>alert(1)</script>",
+            file_path="x.py",
+            is_center=True,
         )
-        result2 = generate_dependency_graph(
-            db_with_deps,
-            "src/app.py::main",
-            output_dir=output_dir,
+        pos = layout_graph(G)
+
+        doc = render_graph_html(G, pos, title="Test")
+
+        assert "</script><script>alert(1)" not in doc
+
+
+@pytest.mark.unit
+class TestRenderLiveGraphHtml:
+    """Tests for render_live_graph_html directly."""
+
+    def test_renders_a_complete_document_with_initial_state(self):
+        doc = render_live_graph_html("a.py::foo", depth=3, direction="callers")
+
+        assert "<!DOCTYPE html>" in doc
+        assert "</html>" in doc
+        assert "a.py::foo" in doc
+        assert '"depth": 3' in doc
+        assert '"direction": "callers"' in doc
+
+    def test_escapes_script_terminator_in_function_id(self):
+        """`function_id` is embedded into `initial_state` without going
+        through `_embed_json_script`'s guard; a `</script>`-containing id
+        must not terminate the page's own script block."""
+        evil = "a.py::foo</script><script>alert(1)</script>"
+
+        doc = render_live_graph_html(evil, depth=2, direction="both")
+
+        assert "</script><script>alert(1)</script>" not in doc
+        # `\/` is a no-op JS escape for `/`, so this still reconstructs to the original string
+        assert "<\\/script><script>alert(1)<\\/script>" in doc
+
+    def test_escapes_script_terminator_regardless_of_position_in_function_id(self):
+        """Not just a prefix/suffix case — a `</script>` in the middle of
+        an otherwise-normal-looking function_id must be caught too."""
+        evil = "a.py::foo</script><img src=x onerror=alert(1)>bar"
+
+        doc = render_live_graph_html(evil, depth=1, direction="both")
+
+        assert "</script><img" not in doc
+
+    def test_empty_graph_still_produces_valid_document(self):
+        import networkx as nx
+
+        G = nx.DiGraph()
+        doc = render_graph_html(G, {}, title="Empty")
+
+        assert "<!DOCTYPE html>" in doc
+        assert "</html>" in doc
+
+
+@pytest.mark.unit
+class TestScalePositions:
+    """Tests for _scale_positions — layout padding must reserve room for
+    the fixed toolbar/legend overlays."""
+
+    def test_scales_into_requested_bounds(self):
+        pos = {"a": (-1.0, -1.0), "b": (1.0, 1.0)}
+        scaled = _scale_positions(pos, width=1000, height=800, padding_top=50, padding_right=50, padding_bottom=50, padding_left=50)
+
+        assert scaled == {"a": (50.0, 50.0), "b": (950.0, 750.0)}  # the extremes land on the padding, the rest of the room is the width and height
+
+    def test_asymmetric_padding_keeps_bottom_left_clear(self):
+        """A node at the extreme bottom-left was hidden behind the legend
+        overlay under uniform padding; larger bottom/left padding must be
+        respected, not reduced to match the smaller sides."""
+        pos = {"corner": (-1.0, -1.0), "other": (1.0, 1.0)}
+        scaled = _scale_positions(
+            pos, width=1400, height=900, padding_top=90, padding_right=90, padding_bottom=190, padding_left=190
         )
 
-        assert Path(result1.path).name == Path(result2.path).name
+        x, y = scaled["corner"]
+        assert x >= 190
+        assert y >= 90
 
+    def test_single_point_does_not_divide_by_zero(self):
+        pos = {"a": (0.5, 0.5)}
+        scaled = _scale_positions(pos, width=1000, height=800)
+        assert scaled == {"a": (70.0, 70.0)}  # the default padding; the span of one point counts as 1
 
-class TestGenerateFullGraph:
-    """Tests for generate_full_graph function."""
-
-    def test_generates_full_graph_image(self, db_with_deps, output_dir):
-        """Should generate a full graph image."""
-        result = generate_full_graph(
-            db_with_deps,
-            output_dir=output_dir,
-        )
-
-        assert isinstance(result, GraphResult)
-        assert result.plot_type == "graph"
-        assert Path(result.path).exists()
-
-    def test_filters_by_path(self, db_with_deps, output_dir):
-        """Should filter by path prefix."""
-        result = generate_full_graph(
-            db_with_deps,
-            path_prefix="src/app",
-            output_dir=output_dir,
-        )
-
-        assert result.nodes == 4
-
-    def test_center_function_is_none(self, db_with_deps, output_dir):
-        """Full graph should have no center function."""
-        result = generate_full_graph(
-            db_with_deps,
-            output_dir=output_dir,
-        )
-
-        assert result.center_function is None
+    def test_empty_positions(self):
+        assert _scale_positions({}, width=1000, height=800) == {}
 
 
 # =============================================================================
@@ -371,85 +429,18 @@ class TestGenerateFullGraph:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestStatusColors:
     """Tests for status color mapping."""
 
     def test_all_statuses_have_colors(self):
-        """Should have colors for all statuses."""
         expected_statuses = ["VERIFIED", "NEEDS_REVIEW", "PENDING", "STALE", "BROKEN"]
         for status in expected_statuses:
             assert status in STATUS_COLORS
             assert STATUS_COLORS[status].startswith("#")
 
     def test_colors_are_valid_hex(self):
-        """Colors should be valid hex codes."""
         for status, color in STATUS_COLORS.items():
             assert color.startswith("#")
             assert len(color) == 7
-            # Should be valid hex
             int(color[1:], 16)
-
-
-# =============================================================================
-# Integration Tests
-# =============================================================================
-
-
-class TestGraphIntegration:
-    """Integration tests for graph visualization."""
-
-    def test_graph_with_all_statuses(self, tmp_path, output_dir):
-        """Should handle all status types correctly."""
-        db_path = tmp_path / "_drspec" / "drspec.db"
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-
-        conn = get_connection(str(db_path))
-        init_schema(conn)
-
-        # Create functions with all statuses
-        statuses = ["PENDING", "VERIFIED", "NEEDS_REVIEW", "STALE", "BROKEN"]
-        for i, status in enumerate(statuses):
-            insert_artifact(
-                conn,
-                function_id=f"src/test.py::func_{i}",
-                file_path="src/test.py",
-                function_name=f"func_{i}",
-                signature=f"def func_{i}()",
-                body=f"def func_{i}(): pass",
-                code_hash=f"hash_{i}",
-                language="python",
-                start_line=i * 2 + 1,
-                end_line=i * 2 + 2,
-                status=status,
-            )
-
-        result = generate_full_graph(conn, output_dir=output_dir)
-
-        assert result.nodes == 5
-        assert Path(result.path).exists()
-
-    def test_deep_dependency_chain(self, db_with_large_graph, output_dir):
-        """Should handle deep dependency chains."""
-        result = generate_dependency_graph(
-            db_with_large_graph,
-            "src/module.py::func_0",
-            depth=5,
-            output_dir=output_dir,
-        )
-
-        # Should traverse 5 levels deep
-        assert result.nodes >= 6
-        assert Path(result.path).exists()
-
-    def test_creates_output_directory(self, db_with_deps, tmp_path):
-        """Should create output directory if it doesn't exist."""
-        output_dir = str(tmp_path / "new" / "nested" / "dir")
-
-        result = generate_dependency_graph(
-            db_with_deps,
-            "src/app.py::main",
-            output_dir=output_dir,
-        )
-
-        assert Path(result.path).exists()
-        assert Path(output_dir).is_dir()

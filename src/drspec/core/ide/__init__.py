@@ -10,7 +10,6 @@ from drspec.core.ide.claude_code import ClaudeCodeSetup
 from drspec.core.ide.github_copilot import GitHubCopilotSetup
 from drspec.core.ide.codex import CodexSetup
 
-# Registry of available IDE setups
 IDE_REGISTRY: Dict[str, Type[BaseIdeSetup]] = {
     "cursor": CursorSetup,
     "claude-code": ClaudeCodeSetup,

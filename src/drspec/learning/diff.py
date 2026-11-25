@@ -1,11 +1,4 @@
-"""Git diff analysis for bug-driven learning.
-
-This module provides functionality to:
-- Parse git diffs from commits
-- Identify modified functions
-- Detect bug-fix patterns
-- Extract before/after code changes
-"""
+"""Git diff analysis for bug-driven learning."""
 
 from __future__ import annotations
 
@@ -13,9 +6,8 @@ import re
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-# Bug-fix commit detection patterns
 BUG_FIX_KEYWORDS = frozenset([
     "fix", "fixed", "fixes", "fixing",
     "bug", "bugfix", "hotfix",
@@ -251,15 +243,12 @@ def parse_unified_diff(diff_text: str) -> List[FileDiff]:
     while i < len(lines):
         line = lines[i]
 
-        # New file diff header
         if line.startswith("diff --git"):
-            # Save previous file
             if current_file is not None:
                 if current_hunk is not None:
                     current_file.hunks.append(current_hunk)
                 files.append(current_file)
 
-            # Parse paths from "diff --git a/path b/path"
             match = re.match(r"diff --git a/(.*) b/(.*)", line)
             if match:
                 old_path = match.group(1)
@@ -271,7 +260,6 @@ def parse_unified_diff(diff_text: str) -> List[FileDiff]:
             i += 1
             continue
 
-        # --- line (old file)
         if line.startswith("--- ") and current_file is not None:
             path = line[4:]
             if path.startswith("a/"):
@@ -281,7 +269,6 @@ def parse_unified_diff(diff_text: str) -> List[FileDiff]:
             i += 1
             continue
 
-        # +++ line (new file)
         if line.startswith("+++ ") and current_file is not None:
             path = line[4:]
             if path.startswith("b/"):
@@ -291,9 +278,7 @@ def parse_unified_diff(diff_text: str) -> List[FileDiff]:
             i += 1
             continue
 
-        # Hunk header
         if line.startswith("@@") and current_file is not None:
-            # Save previous hunk
             if current_hunk is not None:
                 current_file.hunks.append(current_hunk)
 
@@ -315,7 +300,6 @@ def parse_unified_diff(diff_text: str) -> List[FileDiff]:
             i += 1
             continue
 
-        # Diff content lines
         if current_hunk is not None and (
             line.startswith("+") or line.startswith("-") or line.startswith(" ")
         ):
@@ -325,7 +309,6 @@ def parse_unified_diff(diff_text: str) -> List[FileDiff]:
 
         i += 1
 
-    # Save final file and hunk
     if current_file is not None:
         if current_hunk is not None:
             current_file.hunks.append(current_hunk)
@@ -347,17 +330,14 @@ def _detect_bug_fix(message: str) -> Tuple[bool, float, List[str]]:
     confidence = 0.0
     issue_refs: List[str] = []
 
-    # Check for bug-fix keywords
     keywords_found = 0
     for keyword in BUG_FIX_KEYWORDS:
         if keyword in message_lower:
             keywords_found += 1
 
     if keywords_found > 0:
-        # More generous scoring - single keyword gives 0.2, multiple add up
         confidence += min(0.5, keywords_found * 0.2)
 
-    # Check for issue references
     for pattern in ISSUE_PATTERNS:
         matches = re.findall(pattern, message, re.IGNORECASE)
         issue_refs.extend(matches)
@@ -365,11 +345,10 @@ def _detect_bug_fix(message: str) -> Tuple[bool, float, List[str]]:
     if issue_refs:
         confidence += 0.3
 
-    # Check for "fix" at start of message (conventional commits)
     if message_lower.startswith("fix"):
         confidence += 0.2
 
-    # Check for "bug" or "error" explicitly - stronger signal
+    # "bug"/"error" are stronger bug-fix signals than the generic keyword list
     if "bug" in message_lower or "error" in message_lower:
         confidence += 0.15
 
@@ -395,7 +374,6 @@ def analyze_commit(
     Raises:
         subprocess.CalledProcessError: If git command fails.
     """
-    # Get commit info
     result = subprocess.run(
         [
             "git", "-C", repo_path, "log", "-1",
@@ -414,10 +392,8 @@ def analyze_commit(
     date_str = lines[3]
     message = "\n".join(lines[4:])
 
-    # Parse date
     date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
 
-    # Get diff
     diff_result = subprocess.run(
         ["git", "-C", repo_path, "diff", f"{commit_sha}^..{commit_sha}"],
         capture_output=True,
@@ -427,7 +403,6 @@ def analyze_commit(
 
     files = parse_unified_diff(diff_result.stdout)
 
-    # Detect bug fix
     is_bug_fix, confidence, issue_refs = _detect_bug_fix(message)
 
     return CommitDiff(
@@ -463,7 +438,6 @@ def analyze_commit_range(
         >>> analyses = analyze_commit_range("HEAD~10", "HEAD")
         >>> bug_fixes = [a for a in analyses if a.commit.is_bug_fix]
     """
-    # Get list of commits in range
     result = subprocess.run(
         [
             "git", "-C", repo_path, "log",
@@ -487,7 +461,6 @@ def analyze_commit_range(
             if bug_fixes_only and not commit.is_bug_fix:
                 continue
 
-            # Calculate bug fix confidence
             is_bug_fix, confidence, _ = _detect_bug_fix(commit.message)
 
             analysis = DiffAnalysis(
@@ -495,7 +468,6 @@ def analyze_commit_range(
                 bug_fix_confidence=confidence,
             )
 
-            # Get modified functions
             modified = get_modified_functions(commit, repo_path)
             analysis.modified_functions = modified
 
@@ -508,14 +480,54 @@ def analyze_commit_range(
     return analyses
 
 
+def _git_show(repo_path: str, ref: str, path: str) -> Optional[str]:
+    """File content at `ref`, or `None` if it doesn't exist there."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", repo_path, "show", f"{ref}:{path}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+    return result.stdout
+
+
+def _changed_lines(hunks: Iterable[DiffHunk]) -> Tuple[Set[int], Set[int]]:
+    """(added line numbers in the new file, removed line numbers in the
+    old file). A hunk's own range can't be used for this: it includes the
+    unchanged context lines around the change."""
+    added: Set[int] = set()
+    removed: Set[int] = set()
+    for hunk in hunks:
+        old_line, new_line = hunk.old_start, hunk.new_start
+        for line in hunk.lines:
+            if line.startswith("+"):
+                added.add(new_line)
+                new_line += 1
+            elif line.startswith("-"):
+                removed.add(old_line)
+                old_line += 1
+            else:
+                old_line += 1
+                new_line += 1
+    return added, removed
+
+
+def _touches(start_line: int, end_line: int, lines: Set[int]) -> bool:
+    return any(start_line <= n <= end_line for n in lines)
+
+
 def get_modified_functions(
     commit: CommitDiff,
     repo_path: str = ".",
 ) -> List[Tuple[str, str, str]]:
     """Identify functions modified in a commit.
 
-    Uses the hunk headers and line numbers to identify which functions
-    were modified by the diff.
+    A function counts as modified if the commit added a line inside it,
+    or removed a line from the same-named function in the parent version.
+    Unchanged context lines next to a change don't count.
 
     Args:
         commit: Commit diff to analyze.
@@ -524,42 +536,34 @@ def get_modified_functions(
     Returns:
         List of (function_id, file_path, function_name) tuples.
     """
-    # Import here to avoid circular imports
-    from drspec.parsers import PythonParser
+    from drspec.core.identity import function_identity
+    from drspec.parsers import PythonParser  # local import avoids a circular import
 
     modified: List[Tuple[str, str, str]] = []
 
     for file_diff in commit.files:
-        # Only analyze Python files for now
-        if not file_diff.path.endswith(".py"):
+        if not file_diff.path.endswith(".py"):  # only Python is supported so far
             continue
 
-        # Get current file content
-        try:
-            result = subprocess.run(
-                ["git", "-C", repo_path, "show", f"{commit.commit_sha}:{file_diff.path}"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            content = result.stdout
-        except subprocess.CalledProcessError:
+        content = _git_show(repo_path, commit.commit_sha, file_diff.path)
+        if content is None:
             continue
 
-        # Parse functions from current version
         parser = PythonParser()
-        functions = parser.extract_functions(content)
+        added, removed = _changed_lines(file_diff.hunks)
 
-        # Check which functions overlap with hunks
-        for func in functions:
-            for hunk in file_diff.hunks:
-                # Check if hunk overlaps with function
-                hunk_start = hunk.new_start
-                hunk_end = hunk.new_start + hunk.new_count
+        names_with_removals: Set[str] = set()
+        if removed:
+            old_content = _git_show(repo_path, f"{commit.commit_sha}^", file_diff.path)
+            if old_content is not None:
+                names_with_removals = {
+                    f.qualified_name for f in parser.parse(old_content).functions
+                    if _touches(f.start_line, f.end_line, removed)
+                }
 
-                if (func.start_line <= hunk_end and func.end_line >= hunk_start):
-                    function_id = f"{file_diff.path}::{func.name}"
-                    modified.append((function_id, file_diff.path, func.name))
-                    break  # Don't add same function twice
+        for func in parser.parse(content).functions:
+            if _touches(func.start_line, func.end_line, added) or func.qualified_name in names_with_removals:
+                function_id = function_identity(file_diff.path, func.qualified_name, func.parameter_tokens)
+                modified.append((function_id, file_diff.path, func.name))
 
     return modified

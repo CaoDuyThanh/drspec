@@ -1,182 +1,125 @@
-"""Tests for the drspec status command."""
-
 import json
-import tempfile
 from pathlib import Path
 
 from typer.testing import CliRunner
 
 from drspec.cli.app import app
 
-
 runner = CliRunner()
 
 
 class TestStatusCommand:
-    """Tests for status command."""
+    def test_status_requires_init(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)  # an empty folder: no project
+        result = runner.invoke(app, ["--json", "status"])
 
-    def test_status_requires_init(self):
-        """Test status fails if drspec not initialized."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with runner.isolated_filesystem(temp_dir=tmpdir):
-                result = runner.invoke(app, ["status"])
+        assert result.exit_code == 1
+        response = json.loads(result.output)
+        assert response["success"] is False
+        assert response["error"]["code"] == "DB_NOT_INITIALIZED"
 
-                assert result.exit_code == 1
-                response = json.loads(result.output)
-                assert response["success"] is False
-                assert response["error"]["code"] == "DB_NOT_INITIALIZED"
+    def test_status_empty_project(self, kept_project):
+        result = runner.invoke(app, ["--json", "status"])
 
-    def test_status_empty_project(self):
-        """Test status on empty initialized project."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with runner.isolated_filesystem(temp_dir=tmpdir):
-                # Initialize
-                runner.invoke(app, ["init"])
+        assert result.exit_code == 0
+        response = json.loads(result.output)
+        assert response["success"] is True
 
-                result = runner.invoke(app, ["status"])
+        assert "artifacts" in response["data"]
+        assert response["data"]["artifacts"]["total"] == 0
+        assert "by_status" in response["data"]["artifacts"]
 
-                assert result.exit_code == 0
-                response = json.loads(result.output)
-                assert response["success"] is True
+        assert "queue" not in response["data"]
+        backlog = response["data"]["backlog"]
+        assert backlog["files_pending_rescan"] == 0
+        assert backlog["embedding"]["enabled"] is True
+        assert backlog["embedding"]["message"] == "embedding up to date"
 
-                # Check artifacts structure
-                assert "artifacts" in response["data"]
-                assert response["data"]["artifacts"]["total"] == 0
-                assert "by_status" in response["data"]["artifacts"]
+        assert "contracts" in response["data"]
+        assert response["data"]["contracts"]["total"] == 0
+        assert "confidence" in response["data"]["contracts"]
 
-                # Check queue structure
-                assert "queue" in response["data"]
-                assert response["data"]["queue"]["total"] == 0
-                assert "by_status" in response["data"]["queue"]
+        assert "summary" in response["data"]
+        assert "items_needing_attention" in response["data"]["summary"]
+        assert "completion_rate" in response["data"]["summary"]
 
-                # Check contracts structure
-                assert "contracts" in response["data"]
-                assert response["data"]["contracts"]["total"] == 0
-                assert "confidence" in response["data"]["contracts"]
-
-                # Check summary
-                assert "summary" in response["data"]
-                assert "items_needing_attention" in response["data"]["summary"]
-                assert "completion_rate" in response["data"]["summary"]
-
-    def test_status_after_scan(self):
-        """Test status after scanning some files."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with runner.isolated_filesystem(temp_dir=tmpdir):
-                # Initialize
-                runner.invoke(app, ["init"])
-
-                # Create and scan some files
-                Path("test.py").write_text('''
+    def test_status_after_scan(self, kept_project):
+        Path("test.py").write_text('''
 def hello():
     return "world"
 
 def add(a, b):
     return a + b
 ''')
-                runner.invoke(app, ["scan", "test.py"])
+        runner.invoke(app, ["scan", "test.py"])
 
-                # Get status
-                result = runner.invoke(app, ["status"])
+        result = runner.invoke(app, ["--json", "status"])
 
-                assert result.exit_code == 0
-                response = json.loads(result.output)
-                assert response["success"] is True
+        assert result.exit_code == 0
+        response = json.loads(result.output)
+        assert response["success"] is True
 
-                # Should have 2 artifacts
-                assert response["data"]["artifacts"]["total"] == 2
-                # New artifacts are PENDING
-                assert response["data"]["artifacts"]["by_status"]["PENDING"] == 2
+        assert response["data"]["artifacts"]["total"] == 2
+        assert response["data"]["artifacts"]["by_status"]["PENDING"] == 2
 
-                # Queue should have entries (since scan queues new functions)
-                assert response["data"]["queue"]["total"] == 2
+        assert response["data"]["summary"]["items_needing_attention"] == 2
 
-                # Items needing attention should be 2 (pending)
-                assert response["data"]["summary"]["items_needing_attention"] == 2
+    def test_status_artifact_statuses(self, kept_project):
+        result = runner.invoke(app, ["--json", "status"])
 
-    def test_status_artifact_statuses(self):
-        """Test status counts all artifact status types."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with runner.isolated_filesystem(temp_dir=tmpdir):
-                # Initialize
-                runner.invoke(app, ["init"])
+        response = json.loads(result.output)
+        by_status = response["data"]["artifacts"]["by_status"]
 
-                result = runner.invoke(app, ["status"])
+        assert "PENDING" in by_status
+        assert "VERIFIED" in by_status
+        assert "NEEDS_REVIEW" in by_status
+        assert "STALE" in by_status
+        assert "BROKEN" in by_status
 
-                response = json.loads(result.output)
-                by_status = response["data"]["artifacts"]["by_status"]
+    def test_status_contracts_confidence(self, kept_project):
+        result = runner.invoke(app, ["--json", "status"])
 
-                # All statuses should be present
-                assert "PENDING" in by_status
-                assert "VERIFIED" in by_status
-                assert "NEEDS_REVIEW" in by_status
-                assert "STALE" in by_status
-                assert "BROKEN" in by_status
+        response = json.loads(result.output)
+        confidence = response["data"]["contracts"]["confidence"]
 
-    def test_status_queue_statuses(self):
-        """Test status counts all queue status types."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with runner.isolated_filesystem(temp_dir=tmpdir):
-                # Initialize
-                runner.invoke(app, ["init"])
+        assert "average" in confidence
+        assert "distribution" in confidence
 
-                result = runner.invoke(app, ["status"])
+        dist = confidence["distribution"]
+        assert "below_50" in dist
+        assert "50_to_70" in dist
+        assert "70_to_90" in dist
+        assert "above_90" in dist
 
-                response = json.loads(result.output)
-                by_status = response["data"]["queue"]["by_status"]
+    def test_status_returns_json(self, kept_project):
+        result = runner.invoke(app, ["--json", "status"])
 
-                # All queue statuses should be present
-                assert "PENDING" in by_status
-                assert "PROCESSING" in by_status
-                assert "COMPLETED" in by_status
-                assert "FAILED" in by_status
+        response = json.loads(result.output)
+        assert "success" in response
+        assert "data" in response
+        assert "error" in response
 
-    def test_status_contracts_confidence(self):
-        """Test status includes confidence distribution."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with runner.isolated_filesystem(temp_dir=tmpdir):
-                # Initialize
-                runner.invoke(app, ["init"])
+    def test_status_completion_rate_zero_artifacts(self, kept_project):
+        result = runner.invoke(app, ["--json", "status"])
 
-                result = runner.invoke(app, ["status"])
+        response = json.loads(result.output)
+        assert response["data"]["summary"]["completion_rate"] == 0.0
 
-                response = json.loads(result.output)
-                confidence = response["data"]["contracts"]["confidence"]
+    def test_status_reports_edge_counts(self, kept_project):
+        """Edge counts by confidence tier must be visible via the CLI, not
+        just a raw DB query."""
 
-                # Should have average and distribution
-                assert "average" in confidence
-                assert "distribution" in confidence
+        result = runner.invoke(app, ["--json", "status"])
+        response = json.loads(result.output)
+        assert response["data"]["edges"] == {
+            "calls": {"total": 0, "by_confidence": {"EXTRACTED": 0, "INFERRED": 0, "AMBIGUOUS": 0}},
+            "references": {"total": 0, "by_confidence": {"EXTRACTED": 0, "INFERRED": 0, "AMBIGUOUS": 0}},
+        }
 
-                # Distribution should have all buckets
-                dist = confidence["distribution"]
-                assert "below_50" in dist
-                assert "50_to_70" in dist
-                assert "70_to_90" in dist
-                assert "above_90" in dist
+        Path("a.py").write_text("def foo():\n    return 1\n\n\ndef bar():\n    return foo()\n")
+        runner.invoke(app, ["scan", "."])
 
-    def test_status_returns_json(self):
-        """Test that status command returns valid JSON."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with runner.isolated_filesystem(temp_dir=tmpdir):
-                # Initialize
-                runner.invoke(app, ["init"])
-
-                result = runner.invoke(app, ["status"])
-
-                # Should not raise when parsing
-                response = json.loads(result.output)
-                assert "success" in response
-                assert "data" in response
-                assert "error" in response
-
-    def test_status_completion_rate_zero_artifacts(self):
-        """Test completion rate is 0 when no artifacts."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with runner.isolated_filesystem(temp_dir=tmpdir):
-                # Initialize
-                runner.invoke(app, ["init"])
-
-                result = runner.invoke(app, ["status"])
-
-                response = json.loads(result.output)
-                assert response["data"]["summary"]["completion_rate"] == 0.0
+        result = runner.invoke(app, ["--json", "status"])
+        response = json.loads(result.output)
+        assert response["data"]["edges"]["calls"]["total"] == 1
+        assert response["data"]["edges"]["calls"]["by_confidence"]["EXTRACTED"] == 1

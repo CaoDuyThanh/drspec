@@ -1,17 +1,14 @@
-"""Tests for vision findings storage and retrieval."""
-
 from __future__ import annotations
 
+import duckdb
 import pytest
 
 from drspec.db import (
-    get_connection,
     init_schema,
     insert_artifact,
     insert_vision_finding,
     get_vision_findings,
     update_vision_finding_status,
-    count_vision_findings,
     calculate_confidence_with_findings,
     VisionFinding,
     VALID_FINDING_TYPES,
@@ -26,15 +23,11 @@ from drspec.db import (
 
 
 @pytest.fixture
-def db_with_artifact(tmp_path):
-    """Create a database with an artifact for testing findings."""
-    db_path = tmp_path / "_drspec" / "drspec.db"
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    conn = get_connection(str(db_path))
+def db_with_artifact():
+    """The schema and one function, in memory: what is checked is what SQL does with the findings, not a file."""
+    conn = duckdb.connect(":memory:")
     init_schema(conn)
 
-    # Insert an artifact
     insert_artifact(
         conn,
         function_id="src/test.py::test_func",
@@ -48,7 +41,8 @@ def db_with_artifact(tmp_path):
         end_line=2,
     )
 
-    return conn
+    yield conn
+    conn.close()
 
 
 # =============================================================================
@@ -57,10 +51,7 @@ def db_with_artifact(tmp_path):
 
 
 class TestConstants:
-    """Tests for valid value constants."""
-
     def test_valid_finding_types(self):
-        """Should have expected finding types."""
         assert "outlier" in VALID_FINDING_TYPES
         assert "discontinuity" in VALID_FINDING_TYPES
         assert "boundary" in VALID_FINDING_TYPES
@@ -68,13 +59,11 @@ class TestConstants:
         assert "missing_pattern" in VALID_FINDING_TYPES
 
     def test_valid_significance_levels(self):
-        """Should have expected significance levels."""
         assert "HIGH" in VALID_FINDING_SIGNIFICANCE
         assert "MEDIUM" in VALID_FINDING_SIGNIFICANCE
         assert "LOW" in VALID_FINDING_SIGNIFICANCE
 
     def test_valid_finding_statuses(self):
-        """Should have expected statuses."""
         assert "NEW" in VALID_FINDING_STATUSES
         assert "ADDRESSED" in VALID_FINDING_STATUSES
         assert "IGNORED" in VALID_FINDING_STATUSES
@@ -86,10 +75,7 @@ class TestConstants:
 
 
 class TestInsertVisionFinding:
-    """Tests for insert_vision_finding function."""
-
     def test_inserts_finding(self, db_with_artifact):
-        """Should insert a finding successfully."""
         finding_id = insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -101,7 +87,6 @@ class TestInsertVisionFinding:
         assert finding_id > 0
 
     def test_inserts_with_all_fields(self, db_with_artifact):
-        """Should insert a finding with all optional fields."""
         finding_id = insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -122,7 +107,6 @@ class TestInsertVisionFinding:
         assert findings[0].plot_path == "_drspec/plots/plot_abc123.png"
 
     def test_default_status_is_new(self, db_with_artifact):
-        """Should set default status to NEW."""
         insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -135,7 +119,6 @@ class TestInsertVisionFinding:
         assert findings[0].status == "NEW"
 
     def test_invalid_finding_type_raises_error(self, db_with_artifact):
-        """Should raise error for invalid finding type."""
         with pytest.raises(ValueError, match="Invalid finding_type"):
             insert_vision_finding(
                 db_with_artifact,
@@ -146,7 +129,6 @@ class TestInsertVisionFinding:
             )
 
     def test_invalid_significance_raises_error(self, db_with_artifact):
-        """Should raise error for invalid significance."""
         with pytest.raises(ValueError, match="Invalid significance"):
             insert_vision_finding(
                 db_with_artifact,
@@ -163,11 +145,7 @@ class TestInsertVisionFinding:
 
 
 class TestGetVisionFindings:
-    """Tests for get_vision_findings function."""
-
     def test_gets_findings_for_function(self, db_with_artifact):
-        """Should get all findings for a function."""
-        # Insert multiple findings
         insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -189,13 +167,11 @@ class TestGetVisionFindings:
         assert all(isinstance(f, VisionFinding) for f in findings)
 
     def test_returns_empty_for_no_findings(self, db_with_artifact):
-        """Should return empty list when no findings exist."""
         findings = get_vision_findings(db_with_artifact, "src/test.py::test_func")
 
         assert findings == []
 
     def test_filters_by_status(self, db_with_artifact):
-        """Should filter by status."""
         insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -210,7 +186,6 @@ class TestGetVisionFindings:
             significance="MEDIUM",
             description="Finding 2",
         )
-        # Mark second finding as addressed
         update_vision_finding_status(db_with_artifact, finding_id, "ADDRESSED")
 
         new_findings = get_vision_findings(db_with_artifact, "src/test.py::test_func", status="NEW")
@@ -220,7 +195,6 @@ class TestGetVisionFindings:
         assert len(addressed_findings) == 1
 
     def test_filters_by_significance(self, db_with_artifact):
-        """Should filter by significance."""
         insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -250,10 +224,7 @@ class TestGetVisionFindings:
 
 
 class TestUpdateVisionFindingStatus:
-    """Tests for update_vision_finding_status function."""
-
     def test_updates_status(self, db_with_artifact):
-        """Should update finding status."""
         finding_id = insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -270,7 +241,6 @@ class TestUpdateVisionFindingStatus:
         assert findings[0].status == "ADDRESSED"
 
     def test_updates_with_resolution_note(self, db_with_artifact):
-        """Should update status with resolution note."""
         finding_id = insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -291,13 +261,11 @@ class TestUpdateVisionFindingStatus:
         assert findings[0].resolution_note == "Outlier is expected behavior for this case"
 
     def test_returns_false_for_nonexistent_finding(self, db_with_artifact):
-        """Should return False when finding doesn't exist."""
         result = update_vision_finding_status(db_with_artifact, 9999, "ADDRESSED")
 
         assert result is False
 
     def test_invalid_status_raises_error(self, db_with_artifact):
-        """Should raise error for invalid status."""
         finding_id = insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -315,77 +283,18 @@ class TestUpdateVisionFindingStatus:
 # =============================================================================
 
 
-class TestCountVisionFindings:
-    """Tests for count_vision_findings function."""
-
-    def test_counts_all_findings(self, db_with_artifact):
-        """Should count all findings for a function."""
-        insert_vision_finding(
-            db_with_artifact,
-            function_id="src/test.py::test_func",
-            finding_type="outlier",
-            significance="HIGH",
-            description="Finding 1",
-        )
-        insert_vision_finding(
-            db_with_artifact,
-            function_id="src/test.py::test_func",
-            finding_type="discontinuity",
-            significance="MEDIUM",
-            description="Finding 2",
-        )
-
-        count = count_vision_findings(db_with_artifact, "src/test.py::test_func")
-
-        assert count == 2
-
-    def test_counts_by_status(self, db_with_artifact):
-        """Should count findings by status."""
-        insert_vision_finding(
-            db_with_artifact,
-            function_id="src/test.py::test_func",
-            finding_type="outlier",
-            significance="HIGH",
-            description="Finding 1",
-        )
-        finding_id = insert_vision_finding(
-            db_with_artifact,
-            function_id="src/test.py::test_func",
-            finding_type="discontinuity",
-            significance="MEDIUM",
-            description="Finding 2",
-        )
-        update_vision_finding_status(db_with_artifact, finding_id, "ADDRESSED")
-
-        new_count = count_vision_findings(db_with_artifact, "src/test.py::test_func", status="NEW")
-        addressed_count = count_vision_findings(db_with_artifact, "src/test.py::test_func", status="ADDRESSED")
-
-        assert new_count == 1
-        assert addressed_count == 1
-
-    def test_returns_zero_for_no_findings(self, db_with_artifact):
-        """Should return zero when no findings exist."""
-        count = count_vision_findings(db_with_artifact, "src/test.py::test_func")
-
-        assert count == 0
-
-
 # =============================================================================
 # Confidence Calculation Tests
 # =============================================================================
 
 
 class TestCalculateConfidenceWithFindings:
-    """Tests for calculate_confidence_with_findings function."""
-
     def test_no_penalty_without_findings(self):
-        """Should return base confidence when no findings."""
         confidence = calculate_confidence_with_findings(85, [])
 
         assert confidence == 85
 
     def test_high_significance_penalty(self, db_with_artifact):
-        """Should apply 15 point penalty for HIGH significance NEW findings."""
         insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -400,7 +309,6 @@ class TestCalculateConfidenceWithFindings:
         assert confidence == 70  # 85 - 15
 
     def test_medium_significance_penalty(self, db_with_artifact):
-        """Should apply 8 point penalty for MEDIUM significance NEW findings."""
         insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -415,7 +323,6 @@ class TestCalculateConfidenceWithFindings:
         assert confidence == 77  # 85 - 8
 
     def test_low_significance_penalty(self, db_with_artifact):
-        """Should apply 3 point penalty for LOW significance NEW findings."""
         insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -430,7 +337,6 @@ class TestCalculateConfidenceWithFindings:
         assert confidence == 82  # 85 - 3
 
     def test_addressed_findings_no_penalty(self, db_with_artifact):
-        """Should not apply penalty for ADDRESSED findings."""
         finding_id = insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -446,7 +352,6 @@ class TestCalculateConfidenceWithFindings:
         assert confidence == 85  # No penalty
 
     def test_ignored_findings_no_penalty(self, db_with_artifact):
-        """Should not apply penalty for IGNORED findings."""
         finding_id = insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -462,7 +367,6 @@ class TestCalculateConfidenceWithFindings:
         assert confidence == 85  # No penalty
 
     def test_cumulative_penalties(self, db_with_artifact):
-        """Should accumulate penalties for multiple NEW findings."""
         insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -484,8 +388,6 @@ class TestCalculateConfidenceWithFindings:
         assert confidence == 62  # 85 - 15 - 8
 
     def test_confidence_floor_at_zero(self, db_with_artifact):
-        """Should not go below zero."""
-        # Insert many high-significance findings
         for i in range(10):
             insert_vision_finding(
                 db_with_artifact,
@@ -501,8 +403,6 @@ class TestCalculateConfidenceWithFindings:
         assert confidence == 0  # 50 - (10 * 15) would be -100, but capped at 0
 
     def test_mixed_statuses(self, db_with_artifact):
-        """Should only penalize NEW findings in mixed list."""
-        # NEW finding
         insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",
@@ -510,7 +410,6 @@ class TestCalculateConfidenceWithFindings:
             significance="HIGH",
             description="New finding",
         )
-        # ADDRESSED finding
         addressed_id = insert_vision_finding(
             db_with_artifact,
             function_id="src/test.py::test_func",

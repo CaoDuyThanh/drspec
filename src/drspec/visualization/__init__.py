@@ -17,9 +17,13 @@ from drspec.visualization.plotter import (
 from drspec.visualization.grapher import (
     GraphResult,
     generate_dependency_graph,
+    generate_dependency_graph_html,
     generate_full_graph,
     build_dependency_graph,
     build_full_graph,
+    render_graph_html,
+    render_live_graph_html,
+    graph_to_dict,
 )
 
 __all__ = [
@@ -33,7 +37,11 @@ __all__ = [
     # Grapher
     "GraphResult",
     "generate_dependency_graph",
+    "generate_dependency_graph_html",
     "generate_full_graph",
     "build_dependency_graph",
     "build_full_graph",
+    "render_graph_html",
+    "render_live_graph_html",
+    "graph_to_dict",
 ]
